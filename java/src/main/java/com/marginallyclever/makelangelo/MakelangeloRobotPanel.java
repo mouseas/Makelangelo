@@ -70,6 +70,7 @@ import org.kabeja.parser.ParserBuilder;
 import com.marginallyclever.basictypes.ImageManipulator;
 import com.marginallyclever.converters.Converter_Boxes;
 import com.marginallyclever.converters.Converter_Crosshatch;
+import com.marginallyclever.converters.Converter_Patches;
 import com.marginallyclever.converters.Converter_Pulse;
 import com.marginallyclever.converters.Converter_Sandy;
 import com.marginallyclever.converters.Converter_Scanline;
@@ -170,6 +171,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		imageConverters.add(new Converter_Boxes(robot.settings));
 		// imageConverters.add(new Converter_ColorBoxes(robot.settings,
 		// translator));
+		imageConverters.add(new Converter_Patches(robot.settings));
 		imageConverters.add(new Converter_Crosshatch(robot.settings));
 		// imageConverters.add(new Filter_GeneratorColorFloodFill(gui,
 		// robot.settings)); // not ready for public consumption
