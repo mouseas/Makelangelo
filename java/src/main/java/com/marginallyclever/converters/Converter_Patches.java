@@ -14,6 +14,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
+import com.marginallyclever.basictypes.Point2D;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
 import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Translator;
@@ -74,8 +75,12 @@ public class Converter_Patches extends ImageConverter {
 		List<Patch> patches = patchifySamples();
 		
 		// fill each section with lines, with density proportional to section's tone, and random angle:
-		for (Patch patch : patches) {
-			drawPatch(patch, out);
+		try {
+			for (Patch patch : patches) {
+				drawPatch(patch, out);
+			}
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
 		}
 		
 		liftPen(out);
@@ -196,15 +201,111 @@ public class Converter_Patches extends ImageConverter {
 		}
 	}
 	
-	protected void drawPatch(Patch patch, Writer out) throws IOException {
-		double patchPaperXOffset, patchPaperYOffset;
+	protected void drawPatch(Patch patch, Writer out) throws Exception {
+		// get patch bounding box
+		double left = patch.xOffset;
+		double right = patch.xOffset + patch.width;
+		double bottom = patch.yOffset + patch.height;
 		
-		double distanceBetweenLines = ((patch.tone * numTones) + 1) * tool.getDiameter();
+		// determine if patch angle is a special case (vertical or horizontal)
+		boolean vertical = patch.lineAngle == 0;
 		
+		if (!vertical) {
+			// calculate the y step which will yield 'distanceBetweenLines'
+			double distanceBetweenLines = ((patch.tone * numTones) + 1) * tool.getDiameter();
+			// soh cah toa -> sin(angle) = opposite / hypotenuse -> h = o/sin(angle)
+			double yStep = distanceBetweenLines / Math.sin(patch.lineAngle);
+			
+			// calculate lowest y-intercept of lines hitting the bounding box corners. Since one of
+			// the bottom corners will always be the lowest y-intercept, we only need to check those two.
+			double lowYIntercept = calculateYInterceptForCorner(new Point2D(bottom, left), patch.lineAngle);
+			double temp = calculateYInterceptForCorner(new Point2D(bottom, right), patch.lineAngle);
+			if (temp < lowYIntercept) {
+				lowYIntercept = temp;
+			}
+			
+			// the highest y-intercept is equal to the lowest plus the height of the patch.
+			double highYIntercept = lowYIntercept + patch.height;
+			
+			// build lines for the outline of the patch
+			List<Line> lines = new ArrayList<Line>();
+			double slope = Math.tan(patch.lineAngle);
+			for (double yInt = lowYIntercept; yInt < highYIntercept; yInt += yStep) {
+				// TODO figure out line from y intercept to past the right side of patch
+				// y = m*x + b -> y = slope * x + yInt
+				
+			}
+		} else {
+			// TODO handle special case for perfectly vertical lines
+			throw new Exception();
+		}
 		
-		liftPen(out);
-		// go to top-most cell in the left-most column, and start drawing from there
+		// generate lines for the patch's outline
+		List<Line> outline = generatePatchOutline(patch);
 		
+		// check where lines cross the patch outline. These points should occur in pairs.
+		
+		// create Lines for each pair
+		
+		// scale for the physical size of one sample, and transform so center is (0,0)
+		//   ^ might also need to invert y, since image (1,1) is probably physical (1*scale,-1*scale)
+		
+		// draw lines, lifting between lines
+		
+		// TODO optimize line drawing to minimize distance moved between lines.
+		// TODO when distance is less than 'distanceBetweenLines * 1.5' or so, don't lift pen.
+	}
+	
+	protected double calculateYInterceptForCorner(Point2D corner, double angle) {
+		// soh cah toa -> tan(angle) = opposite / adjacent -> a = o/tan(angle)
+		return (corner.x / Math.tan(angle)) + corner.y;
+	}
+	
+	protected List<Line> generatePatchOutline(Patch patch) {
+		List<Line> result = new ArrayList<Line>();
+		
+		// vertical lines
+		for (int x = 0; x <= patch.width; x++) {
+			int startY = -1;
+			for (int y = 0; y <= patch.height; y++) {
+				if (patch.getValueAt(x - 1, y) != patch.getValueAt(x, y)) {
+					// line should include (x,y) to (x,y+1)
+					if (startY >= 0) {
+						startY = y;
+					}
+				} else {
+					// line should not include (x,y) to (x,y+1).
+					// end + save any current line
+					if (startY >= 0) {
+						result.add(new Line(x, startY, x, y));
+					}
+					startY = -1;
+				}
+			}
+		}
+		
+		// horizontal lines
+		for (int y = 0; y <= patch.height; y++) {
+			int startX = -1;
+			for (int x = 0; x <= patch.width; x++) {
+				if (patch.getValueAt(x, y - 1) != patch.getValueAt(x, y)) {
+					// line should include (x,y) to (x+1,y)
+					if (startX >= 0) {
+						// mark start of line
+						startX = x;
+					}
+				} else {
+					// line should not include (x,y) to (x+1,y).
+					if (startX >= 0) {
+						// end + save any current line
+						result.add(new Line(startX, y, x, y));
+					}
+					startX = -1;
+				}
+			}
+		}
+		
+		return result;
 	}
 	
 	/**
@@ -227,7 +328,8 @@ public class Converter_Patches extends ImageConverter {
 			this.height = height;
 			this.tone = tone;
 			
-			lineAngle = rand.nextDouble() * 180; // 181-360 are the same as 1-180
+			lineAngle = (rand.nextDouble() * Math.PI) - (Math.PI / 2);
+			// angles range from straight up, to the right, to straight down, ie left to right
 			
 			// read the imageField to determine which cells belong to this patch, and mark those cells
 			// as ASSIGNED.
@@ -264,6 +366,13 @@ public class Converter_Patches extends ImageConverter {
 			}
 			return result.toString();
 		}
+		
+		public boolean getValueAt(int x, int y) {
+			if (x < 0 || x > width || y < 0 || y > height) {
+				return false;
+			}
+			return samples[y][x];
+		}
 	}
 	
 	protected void debugImageField() {
@@ -282,5 +391,19 @@ public class Converter_Patches extends ImageConverter {
 			result.append("|\n");
 		}
 		System.out.println(result.toString());
+	}
+	
+	protected class Line {
+		protected Point2D a, b;
+		
+		public Line(double x1, double y1, double x2, double y2) {
+			this.a = new Point2D(x1, y1);
+			this.b = new Point2D(x2, y2);
+		}
+		
+		public Line(Point2D a, Point2D b) {
+			this.a = a;
+			this.b = b;
+		}
 	}
 }
