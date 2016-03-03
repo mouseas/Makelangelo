@@ -16,6 +16,7 @@ import javax.swing.JTextField;
 
 import com.marginallyclever.basictypes.Point2D;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
+import com.marginallyclever.makelangelo.Log;
 import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Translator;
 
@@ -69,21 +70,25 @@ public class Converter_Patches extends ImageConverter {
 		numXSamples = (int) (img.getWidth() / sampleSize);
 		numYSamples = (int) (img.getHeight() / sampleSize);
 		
+		Log.write("#FFFFFF", "Sampling image tones...");
 		sampleImageTones(img);
 		
 		// break image into sections of tones
+		Log.write("#FFFFFF", "Patchifying...");
 		List<Patch> patches = patchifySamples();
 		
 		// fill each section with lines, with density proportional to section's tone, and random angle:
 		try {
+			Log.write("#FFFFFF", "Drawing patches...");
 			for (Patch patch : patches) {
 				drawPatch(patch, out);
 			}
 		} catch (Exception e) {
-			System.out.println(e.getMessage());
+			e.printStackTrace();
 		}
 		
 		liftPen(out);
+		Log.write("#FFFFFF", "Done.");
 	}
 	
 	protected boolean showSettingsPanel(BufferedImage img, Writer out) throws IOException {
@@ -99,6 +104,7 @@ public class Converter_Patches extends ImageConverter {
 		
 		int result = JOptionPane.showConfirmDialog(null, panel, getName(), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 		if (result == JOptionPane.OK_OPTION) {
+			Log.write("#FFFFFF", "Converting to patches...");
 			// number of tones
 			try {
 				numTones = Short.parseShort(field_tones.getText());
@@ -111,6 +117,7 @@ public class Converter_Patches extends ImageConverter {
 			if (numTones > MAX_NUM_TONES) {
 				numTones = MAX_NUM_TONES;
 			}
+			Log.write("#FFFFFF", "Tones: " + numTones);
 			
 			// sample size
 			try {
@@ -121,6 +128,7 @@ public class Converter_Patches extends ImageConverter {
 			if (sampleSize <= 0) {
 				sampleSize = DEFAULT_SAMPLE_SIZE;
 			}
+			Log.write("#FFFFFF", "Sample size: " + sampleSize + "px");
 			
 			// run conversion
 			convertImageToSketchyPatches(img, out);
@@ -144,20 +152,18 @@ public class Converter_Patches extends ImageConverter {
 	}
 	
 	protected List<Patch> patchifySamples() {
-		int numUnassignedCells = numXSamples * numYSamples;
+		// TODO fix this method. Sometimes the method just dies, possibly due to using too much memory...?
 		int firstCellX = 0;
 		int firstCellY = 0;
 		List<Patch> results = new ArrayList<Patch>();
-		while (numUnassignedCells > 0) {
-			// find first unassigned cell
-			short tone;
-			for(; firstCellY < numYSamples; firstCellY++) {
-				for (firstCellX = 0; firstCellX < numXSamples; firstCellX++) {
-					tone = imageField[firstCellY][firstCellX];
-					if (tone != ASSIGNED_TONE) {
-						// then flood fill, make patch
-						results.add(makePatchViaFloodFill(firstCellX, firstCellY, tone));
-					}
+		short tone;
+		// find first unassigned cell for each patch
+		for(; firstCellY < numYSamples; firstCellY++) {
+			for (firstCellX = 0; firstCellX < numXSamples; firstCellX++) {
+				tone = imageField[firstCellY][firstCellX];
+				if (tone != ASSIGNED_TONE) {
+					// then flood fill, make patch
+					results.add(makePatchViaFloodFill(firstCellX, firstCellY, tone));
 				}
 			}
 		}
@@ -214,7 +220,7 @@ public class Converter_Patches extends ImageConverter {
 			// calculate the y step which will yield 'distanceBetweenLines'
 			double distanceBetweenLines = ((patch.tone * numTones) + 1) * tool.getDiameter();
 			// soh cah toa -> sin(angle) = opposite / hypotenuse -> h = o/sin(angle)
-			double yStep = distanceBetweenLines / Math.sin(patch.lineAngle);
+			double yStep = Math.abs(distanceBetweenLines / Math.sin(patch.lineAngle));
 			
 			// calculate lowest y-intercept of lines hitting the bounding box corners. Since one of
 			// the bottom corners will always be the lowest y-intercept, we only need to check those two.
@@ -242,6 +248,13 @@ public class Converter_Patches extends ImageConverter {
 		
 		// generate lines for the patch's outline
 		List<Line> outline = generatePatchOutline(patch);
+		Point2D center = new Point2D(-(numXSamples / 2), -(numYSamples / 2));
+		Point2D flipVertical = new Point2D(1, -1);
+		for (Line line : outline) {
+			translateLine(line, center);
+			scaleLine(line, flipVertical);
+			drawLine(line, out);
+		}
 		
 		// check where lines cross the patch outline. These points should occur in pairs.
 		
@@ -270,14 +283,15 @@ public class Converter_Patches extends ImageConverter {
 			for (int y = 0; y <= patch.height; y++) {
 				if (patch.getValueAt(x - 1, y) != patch.getValueAt(x, y)) {
 					// line should include (x,y) to (x,y+1)
-					if (startY >= 0) {
+					if (startY < 0) {
 						startY = y;
 					}
 				} else {
 					// line should not include (x,y) to (x,y+1).
 					// end + save any current line
 					if (startY >= 0) {
-						result.add(new Line(x, startY, x, y));
+						result.add(new Line(x + patch.xOffset, startY + patch.yOffset,
+								x + patch.xOffset, y + patch.yOffset));
 					}
 					startY = -1;
 				}
@@ -290,7 +304,7 @@ public class Converter_Patches extends ImageConverter {
 			for (int x = 0; x <= patch.width; x++) {
 				if (patch.getValueAt(x, y - 1) != patch.getValueAt(x, y)) {
 					// line should include (x,y) to (x+1,y)
-					if (startX >= 0) {
+					if (startX < 0) {
 						// mark start of line
 						startX = x;
 					}
@@ -298,7 +312,8 @@ public class Converter_Patches extends ImageConverter {
 					// line should not include (x,y) to (x+1,y).
 					if (startX >= 0) {
 						// end + save any current line
-						result.add(new Line(startX, y, x, y));
+						result.add(new Line(startX + patch.xOffset, y + patch.yOffset,
+								x + patch.xOffset, y + patch.yOffset));
 					}
 					startX = -1;
 				}
@@ -306,6 +321,39 @@ public class Converter_Patches extends ImageConverter {
 		}
 		
 		return result;
+	}
+	
+	protected void scaleLine(Line line, Point2D scale) {
+		line.a.x = scale.x * line.a.x;
+		line.a.y = scale.y * line.a.y;
+		line.b.x = scale.x * line.b.x;
+		line.b.y = scale.y * line.b.y;
+	}
+	
+	protected void translateLine(Line line, Point2D translation) {
+		line.a.x += translation.x;
+		line.a.y += translation.y;
+		line.b.x += translation.x;
+		line.b.y += translation.y;
+	}
+	
+	protected void drawLine(Line line, Writer out) {
+		try {
+			// go to point a without drawing
+			if (!lastUp) { // TODO don't lift if distance to a is (close to) 0
+				liftPen(out);
+			}
+			tool.writeMoveTo(out, (float) line.a.x, (float) line.a.y);
+			
+			// draw from a to b.
+			if (lastUp) {
+				lowerPen(out);
+			}
+			tool.writeMoveTo(out, (float) line.b.x, (float) line.b.y);
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 	
 	/**
@@ -342,11 +390,9 @@ public class Converter_Patches extends ImageConverter {
 					}
 				}
 			}
-			
-			System.out.println(toString());
 		}
 		
-		@Override
+		/*@Override
 		public String toString() {
 			StringBuilder result = new StringBuilder();
 			for (int y = 0; y < numYSamples; y++) {
@@ -365,10 +411,10 @@ public class Converter_Patches extends ImageConverter {
 				result.append("|\n");
 			}
 			return result.toString();
-		}
+		}*/
 		
 		public boolean getValueAt(int x, int y) {
-			if (x < 0 || x > width || y < 0 || y > height) {
+			if (x < 0 || x >= width || y < 0 || y >= height) {
 				return false;
 			}
 			return samples[y][x];
@@ -404,6 +450,11 @@ public class Converter_Patches extends ImageConverter {
 		public Line(Point2D a, Point2D b) {
 			this.a = a;
 			this.b = b;
+		}
+		
+		@Override
+		public String toString() {
+			return "(" + a.x + "," + a.y + ") to (" + b.x + "," + b.y + ")";
 		}
 	}
 }
