@@ -7,7 +7,6 @@ import java.io.Writer;
 
 import com.marginallyclever.basictypes.C3;
 import com.marginallyclever.basictypes.ColorPalette;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Translator;
 
 
@@ -26,9 +25,7 @@ public class Converter_ColorBoxes extends ImageConverter {
 	private int direction = 1;
 
 
-	public Converter_ColorBoxes(MakelangeloRobotSettings mc) {
-		super(mc);
-
+	public Converter_ColorBoxes() {
 		palette = new ColorPalette();
 		palette.addColor(new C3(0, 0, 0));
 		palette.addColor(new C3(255, 0, 0));
@@ -222,18 +219,18 @@ public class Converter_ColorBoxes extends ImageConverter {
 
 
 /**
- * This file is part of DrawbotGUI.
+ * This file is part of Makelangelo.
  * <p>
- * DrawbotGUI is free software: you can redistribute it and/or modify
+ * Makelangelo is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * <p>
- * DrawbotGUI is distributed in the hope that it will be useful,
+ * Makelangelo is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * <p>
  * You should have received a copy of the GNU General Public License
- * along with DrawbotGUI.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Makelangelo.  If not, see <http://www.gnu.org/licenses/>.
  */

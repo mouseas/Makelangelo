@@ -2,21 +2,21 @@ package com.marginallyclever.converters;
 
 
 import java.awt.image.BufferedImage;
+import java.awt.Point;
 import java.io.IOException;
 import java.io.Writer;
 import java.text.DecimalFormat;
 import java.util.concurrent.locks.ReentrantLock;
 
 import com.jogamp.opengl.GL2;
-import com.marginallyclever.basictypes.Point2D;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
 import com.marginallyclever.filters.Filter_DitherFloydSteinberg;
 import com.marginallyclever.filters.Filter_Resize;
 import com.marginallyclever.filters.ImageFilter;
 import com.marginallyclever.makelangelo.DrawPanelDecorator;
 import com.marginallyclever.makelangelo.Log;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Translator;
+import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettings;
 
 
 /**
@@ -26,12 +26,6 @@ import com.marginallyclever.makelangelo.Translator;
  * @author Dan
  */
 public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorator {
-	private ReentrantLock lock = new ReentrantLock();
-
-	public String getName() {
-		return Translator.get("ZigZagName");
-	}
-
 	// processing tools
 	long t_elapsed, t_start;
 	double progress;
@@ -39,13 +33,16 @@ public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorat
 	long time_limit = 10 * 60 * 1000;  // 10 minutes
 
 	int numPoints;
-	Point2D[] points = null;
+	Point[] points = null;
 	int[] solution = null;
 	int scount;
 
+	
+	private ReentrantLock lock = new ReentrantLock();
 
-	public Converter_ZigZag(MakelangeloRobotSettings mc) {
-		super(mc);
+	
+	public String getName() {
+		return Translator.get("ZigZagName");
 	}
 
 
@@ -129,7 +126,7 @@ public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorat
 				while (lock.isLocked()) ;
 
 				lock.lock();
-				//DrawbotGUI.getSingleton().Log("<font color='red'>flipping "+(finish-begin)+"</font>\n");
+				//Makelangelo.getSingleton().Log("<font color='red'>flipping "+(finish-begin)+"</font>\n");
 				for (j = 0; j < half; ++j) {
 					temp = solution[begin + j];
 					solution[begin + j] = solution[finish - 1 - j];
@@ -320,7 +317,7 @@ public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorat
 		}
 
 		Log.write("green", numPoints + " points.");
-		points = new Point2D[numPoints + 1];
+		points = new Point[numPoints + 1];
 		solution = new int[numPoints + 1];
 
 		// collect the point data
@@ -329,7 +326,9 @@ public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorat
 			for (x = 0; x < imageWidth; ++x) {
 				i = ImageFilter.decode(img.getRGB(x, y));
 				if (i == 0) {
-					points[numPoints++] = new Point2D(TX(x), TY(y));
+					Point p = new Point();
+					p.setLocation( TX(x), TY(y) );
+					points[numPoints++] = p;
 				}
 			}
 		}
@@ -367,18 +366,18 @@ public class Converter_ZigZag extends ImageConverter implements DrawPanelDecorat
 
 
 /**
- * This file is part of DrawbotGUI.
+ * This file is part of Makelangelo.
  * <p>
- * DrawbotGUI is free software: you can redistribute it and/or modify
+ * Makelangelo is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * <p>
- * DrawbotGUI is distributed in the hope that it will be useful,
+ * Makelangelo is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * <p>
  * You should have received a copy of the GNU General Public License
- * along with DrawbotGUI.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Makelangelo.  If not, see <http://www.gnu.org/licenses/>.
  */

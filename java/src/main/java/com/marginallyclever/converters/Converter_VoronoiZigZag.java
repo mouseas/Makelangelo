@@ -2,6 +2,7 @@ package com.marginallyclever.converters;
 
 import java.awt.GridLayout;
 import java.awt.image.BufferedImage;
+import java.awt.Point;
 import java.io.IOException;
 import java.io.Writer;
 import java.text.DecimalFormat;
@@ -16,12 +17,11 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 
 import com.jogamp.opengl.GL2;
-import com.marginallyclever.basictypes.Point2D;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
 import com.marginallyclever.makelangelo.DrawPanelDecorator;
 import com.marginallyclever.makelangelo.Log;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Translator;
+import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettings;
 import com.marginallyclever.voronoi.VoronoiCell;
 import com.marginallyclever.voronoi.VoronoiCellEdge;
 import com.marginallyclever.voronoi.VoronoiGraphEdge;
@@ -46,8 +46,8 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 	private static int MAX_GENERATIONS=200;
 	private static int MAX_CELLS=3000;
 	private static float CUTOFF=1.0f;
-	private Point2D bound_min = new Point2D();
-	private Point2D bound_max = new Point2D();
+	private Point bound_min = new Point();
+	private Point bound_max = new Point();
 	private int numEdgesInCell;
 	private List<VoronoiCellEdge> cellBorder = null;
 	private double[] xValuesIn=null;
@@ -62,10 +62,6 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 	private double old_len,len;
 	private long time_limit=10*60*1000;  // 10 minutes
 
-
-	public Converter_VoronoiZigZag(MakelangeloRobotSettings mc) {
-		super(mc);
-	}
 
 	@Override
 	public String getName() { return Translator.get("ZigZagName")+" 2"; }
@@ -268,7 +264,7 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 				while(lock.isLocked());
 
 				lock.lock();  
-				//DrawbotGUI.getSingleton().Log("<font color='red'>flipping "+(finish-begin));
+				//Makelangelo.getSingleton().Log("<font color='red'>flipping "+(finish-begin));
 				for(j=0;j<half;++j) {
 					temp = solution[ti(begin+j)];
 					solution[ti(begin+j)]=solution[ti(finish-1-j)];
@@ -385,14 +381,14 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 			if(place_at_random) {
 				for(used = 0; used < MAX_CELLS; used++ ) {
 					cells[used]=new VoronoiCell();
-					cells[used].centroid.set(((float)Math.random()*(float)w),((float)Math.random()*(float)h));
+					cells[used].centroid.setLocation(((float)Math.random()*(float)w),((float)Math.random()*(float)h));
 				}
 			} else {
 				for(y = 0; y < h; y += length ) {
 					if(dir==1) {
 						for(x = 0; x < w; x += length ) {
 							cells[used]=new VoronoiCell();
-							cells[used].centroid.set(x,y);
+							cells[used].centroid.setLocation(x,y);
 							++used;
 							if(used==MAX_CELLS) break;
 						}
@@ -400,7 +396,7 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 					} else {
 						for(x = w-1; x >= 0; x -= length ) {
 							cells[used]=new VoronoiCell();
-							cells[used].centroid.set(x,y);
+							cells[used].centroid.setLocation(x,y);
 							++used;
 							if(used==MAX_CELLS) break;
 						}
@@ -535,29 +531,29 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 			if (e.site1 != cellIndex && e.site2 != cellIndex) continue;
 			if (numEdgesInCell == 0) {
 				if (e.x1 < e.x2) {
-					bound_min.x = (float) e.x1;
-					bound_max.x = (float) e.x2;
+					bound_min.setLocation( e.x1, bound_min.getY() );
+					bound_max.setLocation( e.x2, bound_max.getY() );
 				} else {
-					bound_min.x = (float) e.x2;
-					bound_max.x = (float) e.x1;
+					bound_min.setLocation( e.x2, bound_min.getY() );
+					bound_max.setLocation( e.x1, bound_max.getY() );
 				}
 				if (e.y1 < e.y2) {
-					bound_min.y = (float) e.y1;
-					bound_max.y = (float) e.y2;
+					bound_min.setLocation( bound_min.getX(), (float) e.y1 );
+					bound_max.setLocation( bound_max.getX(), (float) e.y2 );
 				} else {
-					bound_min.y = (float) e.y2;
-					bound_max.y = (float) e.y1;
+					bound_min.setLocation( bound_min.getX(), (float) e.y2 );
+					bound_max.setLocation( bound_max.getX(), (float) e.y1 );
 				}
 			} else {
-				if (bound_min.x > e.x1) bound_min.x = (float) e.x1;
-				if (bound_min.x > e.x2) bound_min.x = (float) e.x2;
-				if (bound_max.x < e.x1) bound_max.x = (float) e.x1;
-				if (bound_max.y < e.y2) bound_max.y = (float) e.y2;
+				if (bound_min.x > e.x1) bound_min.setLocation( e.x1, bound_min.getY() );
+				if (bound_min.x > e.x2) bound_min.setLocation( e.x2, bound_min.getY() );
+				if (bound_max.x < e.x1) bound_max.setLocation( e.x1, bound_max.getY() );
+				if (bound_max.x < e.x2) bound_max.setLocation( e.x2, bound_max.getY() );
 
-				if (bound_min.y > e.y1) bound_min.y = (float) e.y1;
-				if (bound_min.y > e.y2) bound_min.y = (float) e.y2;
-				if (bound_max.y < e.y1) bound_max.y = (float) e.y1;
-				if (bound_max.y < e.y2) bound_max.y = (float) e.y2;
+				if (bound_min.y > e.y1) bound_min.setLocation( bound_min.getX(), e.y1 );
+				if (bound_min.y > e.y2) bound_min.setLocation( bound_min.getX(), e.y2 );
+				if (bound_max.y < e.y1) bound_max.setLocation( bound_max.getX(), e.y1 );
+				if (bound_max.y < e.y2) bound_max.setLocation( bound_max.getX(), e.y2 );
 			}
 
 			// make a unnormalized vector along the edge of e
@@ -656,25 +652,25 @@ public class Converter_VoronoiZigZag extends ImageConverter implements DrawPanel
 			if(wy>=h) wy = h-1;
 
 			// use the new center
-			cells[i].centroid.set(wx, wy);
+			cells[i].centroid.setLocation(wx, wy);
 		}
 	}
 }
 
 
 /**
- * This file is part of DrawbotGUI.
+ * This file is part of Makelangelo.
  *
- * DrawbotGUI is free software: you can redistribute it and/or modify
+ * Makelangelo is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
- * DrawbotGUI is distributed in the hope that it will be useful,
+ * Makelangelo is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with DrawbotGUI.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Makelangelo.  If not, see <http://www.gnu.org/licenses/>.
  */

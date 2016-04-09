@@ -20,6 +20,7 @@ public final class SerialConnection implements SerialPortEventListener, Marginal
 	private SerialPort serialPort;
 	private static final int BAUD_RATE = 57600;
 
+	private MarginallyCleverConnectionManager connectionManager;
 	private String connectionName = "";
 	private boolean portOpened = false;
 	private boolean waitingForCue = false;
@@ -176,7 +177,7 @@ public final class SerialConnection implements SerialPortEventListener, Marginal
 	protected void sendQueuedCommand() {
 		if(!portOpened || waitingForCue) return;
 		
-		if(commandQueue.size()==0) {
+		if(commandQueue.isEmpty()==true) {
 		      notifyConnectionReady();
 		      return;
 		}
@@ -268,5 +269,13 @@ public final class SerialConnection implements SerialPortEventListener, Marginal
 	      for (MarginallyCleverConnectionReadyListener listener : listeners) {
 	        listener.dataAvailable(this,line);
 	      }
+	}
+	
+	
+	public void setManager(MarginallyCleverConnectionManager manager) {
+		this.connectionManager = manager;
+	}
+	public MarginallyCleverConnectionManager getManager() {
+		return this.connectionManager;
 	}
 }

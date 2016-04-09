@@ -9,7 +9,7 @@ import com.jogamp.opengl.GL2;
 import com.marginallyclever.basictypes.ImageManipulator;
 import com.marginallyclever.filters.ImageFilter;
 import com.marginallyclever.makelangelo.DrawPanelDecorator;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
+import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettings;
 
 /**
  * Converts a BufferedImage to gcode
@@ -30,10 +30,6 @@ public abstract class ImageConverter extends ImageManipulator implements DrawPan
 
 	protected int colorChannel = 0;
 
-
-	public ImageConverter(MakelangeloRobotSettings mc) {
-		super(mc);
-	}
 
 	/**
 	 * @param img the <code>java.awt.image.BufferedImage</code> this filter is using as source material.

@@ -3,6 +3,7 @@ package com.marginallyclever.converters;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Point;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.Writer;
@@ -10,9 +11,7 @@ import java.util.LinkedList;
 
 import com.marginallyclever.basictypes.C3;
 import com.marginallyclever.basictypes.ColorPalette;
-import com.marginallyclever.basictypes.Point2D;
 import com.marginallyclever.filters.Filter_GaussianBlur;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
 import com.marginallyclever.makelangelo.Log;
 import com.marginallyclever.makelangelo.Translator;
 
@@ -28,9 +27,7 @@ public class Converter_ColorFloodFill extends ImageConverter {
 	private BufferedImage imgMask;
 
 
-	public Converter_ColorFloodFill(MakelangeloRobotSettings mc) {
-		super(mc);
-
+	public Converter_ColorFloodFill() {
 		palette = new ColorPalette();
 		palette.addColor(new C3(0, 0, 0));
 		palette.addColor(new C3(255, 0, 0));
@@ -149,10 +146,10 @@ public class Converter_ColorFloodFill extends ImageConverter {
 	 * @throws IOException
 	 */
 	protected void floodFillBlob(int color_index, int x, int y, Writer osw) throws IOException {
-		LinkedList<Point2D> points_to_visit = new LinkedList<>();
-		points_to_visit.add(new Point2D(x, y));
+		LinkedList<Point> points_to_visit = new LinkedList<>();
+		points_to_visit.add(new Point(x, y));
 
-		Point2D a;
+		Point a;
 
 		while (!points_to_visit.isEmpty()) {
 			a = points_to_visit.removeLast();
@@ -179,13 +176,13 @@ public class Converter_ColorFloodFill extends ImageConverter {
 			last_y = (int) a.y;
 
 			//      if( !getMaskTouched((int)(a.x+diameter),(int)a.y           ) )
-			points_to_visit.add(new Point2D(a.x + diameter, a.y));
+			points_to_visit.add(new Point(a.x + diameter, a.y));
 			//      if( !getMaskTouched((int)(a.x-diameter),(int)a.y           ) )
-			points_to_visit.add(new Point2D(a.x - diameter, a.y));
+			points_to_visit.add(new Point(a.x - diameter, a.y));
 			//      if( !getMaskTouched((int)a.x           ,(int)(a.y+diameter)) )
-			points_to_visit.add(new Point2D(a.x, a.y + diameter));
+			points_to_visit.add(new Point(a.x, a.y + diameter));
 			//      if( !getMaskTouched((int)a.x           ,(int)(a.y-diameter)) )
-			points_to_visit.add(new Point2D(a.x, a.y - diameter));
+			points_to_visit.add(new Point(a.x, a.y - diameter));
 		}
 	}
 
@@ -290,18 +287,18 @@ public class Converter_ColorFloodFill extends ImageConverter {
 
 
 /**
- * This file is part of DrawbotGUI.
+ * This file is part of Makelangelo.
  * <p>
- * DrawbotGUI is free software: you can redistribute it and/or modify
+ * Makelangelo is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * <p>
- * DrawbotGUI is distributed in the hope that it will be useful,
+ * Makelangelo is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * <p>
  * You should have received a copy of the GNU General Public License
- * along with DrawbotGUI.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Makelangelo.  If not, see <http://www.gnu.org/licenses/>.
  */

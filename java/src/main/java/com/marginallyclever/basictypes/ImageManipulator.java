@@ -9,7 +9,8 @@ import javax.swing.SwingWorker;
 
 import com.marginallyclever.drawingtools.DrawingTool;
 import com.marginallyclever.makelangelo.DrawPanel;
-import com.marginallyclever.makelangelo.MakelangeloRobotSettings;
+import com.marginallyclever.makelangeloRobot.MakelangeloRobot;
+import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettings;
 
 
 /**
@@ -39,16 +40,16 @@ public abstract class ImageManipulator {
 	protected DrawPanel drawPanel;
 
 
-	public ImageManipulator(MakelangeloRobotSettings mc) {
-		machine = mc;
-	}
-
 	public void setParent(SwingWorker<Void, Void> p) {
 		parent = p;
 	}
 
 	public void setProgressMonitor(ProgressMonitor p) {
 		pm = p;
+	}
+	
+	public void setMachine(MakelangeloRobot robot) {
+		machine = robot.settings;
 	}
 
 	public void setDrawPanel(DrawPanel drawPanel) {
@@ -154,18 +155,18 @@ public abstract class ImageManipulator {
 }
 
 /**
- * This file is part of DrawbotGUI.
+ * This file is part of Makelangelo.
  * <p>
- * DrawbotGUI is free software: you can redistribute it and/or modify
+ * Makelangelo is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  * <p>
- * DrawbotGUI is distributed in the hope that it will be useful,
+ * Makelangelo is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  * <p>
  * You should have received a copy of the GNU General Public License
- * along with DrawbotGUI.  If not, see <http://www.gnu.org/licenses/>.
+ * along with Makelangelo.  If not, see <http://www.gnu.org/licenses/>.
  */
