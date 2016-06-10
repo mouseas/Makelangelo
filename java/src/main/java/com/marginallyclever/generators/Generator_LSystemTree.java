@@ -1,13 +1,8 @@
 package com.marginallyclever.generators;
 
 import java.awt.GridLayout;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -16,24 +11,20 @@ import javax.swing.JTextField;
 import com.marginallyclever.makelangelo.Translator;
 
 public class Generator_LSystemTree extends ImageGenerator {
-	float turtleX, turtleY;
-	float turtleDx, turtleDy;
-	float turtleStep = 10.0f;
-	float xmax = 7;
-	float xmin = -7;
-	float ymax = 7;
-	float ymin = -7;
-	float toolOffsetZ = 1.25f;
-	float zDown = 40;
-	float zUp = 90;
-	int order = 4; // controls complexity of curve
-	float x, y;
+	private float turtleStep = 10.0f;
+	private float xmax = 7;
+	private float xmin = -7;
+	private float ymax = 7;
+	private float ymin = -7;
+	private int order = 4; // controls complexity of curve
 
 	float maxSize;
 
-	float angleSpan = 120;
-	int numBranches = 3;
-	float orderScale = 0.76f;
+	private float angleSpan = 120;
+	private int numBranches = 3;
+	private float orderScale = 0.76f;
+	
+	private Turtle turtle;
 
 
 	@Override
@@ -41,22 +32,9 @@ public class Generator_LSystemTree extends ImageGenerator {
 		return Translator.get("LSystemTreeName");
 	}
 
-	/**
-	 * Overrides the basic MoveTo() because optimizing for spirals is different logic than straight lines.
-	 */
-	@Override
-	protected void moveTo(Writer out, float x, float y, boolean up) throws IOException {
-		tool.writeMoveTo(out, TX(x), TY(y));
-		if (lastUp != up) {
-			if (up) liftPen(out);
-			else lowerPen(out);
-			lastUp = up;
-		}
-	}
-
 
 	@Override
-	public boolean generate(final String dest) {
+	public boolean generate(Writer out) throws IOException {
 		boolean tryAgain=false;
 		do {
 			final JTextField field_order = new JTextField(Integer.toString(order));
@@ -86,7 +64,7 @@ public class Generator_LSystemTree extends ImageGenerator {
 
 				// TODO: check angleSpan>0, angleSpan<360, numBranches>0, Order>0
 
-				createCurveNow(dest);
+				createCurveNow(out);
 				return true;
 			}
 		}
@@ -96,99 +74,67 @@ public class Generator_LSystemTree extends ImageGenerator {
 	}
 
 
-	private void createCurveNow(String dest) {
-		try (
-				final OutputStream fileOutputStream = new FileOutputStream(dest);
-				final Writer output = new OutputStreamWriter(fileOutputStream, StandardCharsets.UTF_8)
-				) {
-			tool = machine.getCurrentTool();
-			output.write(machine.getConfigLine() + ";\n");
-			output.write(machine.getBobbinLine() + ";\n");
-			tool.writeChangeTo(output);
+	private void createCurveNow(Writer out) throws IOException {
+		imageStart(out);
 
-			w2=0;
-			h2=0;
-			scale=10.0f;
+		float v = Math.min((float)(machine.getPaperWidth() * machine.getPaperMargin()),
+				(float)(machine.getPaperHeight() * machine.getPaperMargin())) * 10.0f / 2.0f;
+		xmax = v;
+		ymax = v;
+		xmin = -v;
+		ymin = -v;
 
-			float v = Math.min((float)(machine.getPaperWidth() * machine.getPaperMargin())/2.0f,
-					(float)(machine.getPaperHeight() * machine.getPaperMargin())/2.0f);
-			xmax = v;
-			ymax = v;
-			xmin = -v;
-			ymin = -v;
+		turtle = new Turtle();
+		
+		turtleStep = (float) ((xmax - xmin) / (Math.pow(2, order)));
 
-			turtleStep = (float) ((xmax - xmin) / (Math.pow(2, order)));
-			turtleX = 0;
-			turtleY = 0;
-			turtleDx = 0;
-			turtleDy = -1;
-
-			float xx = xmax - xmin;
-			float yy = ymax - ymin;
-			maxSize = xx > yy ? xx : yy;
-			/*
-      // Draw bounding box
-      //SetAbsoluteMode(output);
-      liftPen(output);
-      moveTo(output, xmax, ymax, false);
-      moveTo(output, xmax, ymin, false);
-      moveTo(output, xmin, ymin, false);
-      moveTo(output, xmin, ymax, false);
-      moveTo(output, xmax, ymax, false);
-			 */
-		      liftPen(output);
-			// move to starting position
-			x = 0;//(xmax - turtleStep / 2);
-			y = (ymax - turtleStep / 2);
-			moveTo(output, x, y, true);
-			lowerPen(output);
-			// do the curve
-			lSystemTree(output, order, maxSize/4);
-			liftPen(output);
-
-			output.flush();
-			output.close();
-		} catch (IOException ex) {
-		}
+		float xx = xmax - xmin;
+		float yy = ymax - ymin;
+		maxSize = xx > yy ? xx : yy;
+		
+		// Draw bounding box
+		//SetAbsoluteMode(output);
+		liftPen(out);
+		moveTo(out, xmax, ymax, false);
+		moveTo(out, xmax, ymin, false);
+		moveTo(out, xmin, ymin, false);
+		moveTo(out, xmin, ymax, false);
+		moveTo(out, xmax, ymax, false);
+		 
+	      liftPen(out);
+		// move to starting position
+		turtle.setX(0);
+		turtle.setY(ymax - turtleStep / 2);
+		moveTo(out, turtle.getX(), turtle.getY(), true);
+		lowerPen(out);
+		// do the curve
+		lSystemTree(out, order, maxSize/4);
+		liftPen(out);
 	}
 
 
-	// L System tree
+	// recursive L System tree fractal
 	private void lSystemTree(Writer output, int n, float distance) throws IOException {
 		if (n == 0) return;
-		turtle_goForward(output,distance);
+		// 
+		turtleMove(output,distance);
 		if(n>1) {
 			float angleStep = angleSpan / (float)(numBranches-1);
 
-			turtle_turn(-(angleSpan/2.0f));
+			turtle.turn(-(angleSpan/2.0f));
 			for(int i=0;i<numBranches;++i) {
 				lSystemTree(output,n-1,distance*orderScale);
-				turtle_turn(angleStep);
+				turtle.turn(angleStep);
 			}
-			turtle_turn(-(angleSpan/2.0f)-angleStep);
+			turtle.turn(-(angleSpan/2.0f)-angleStep);
 
 		}
-		turtle_goForward(output,-distance);
+		turtleMove(output,-distance);
 	}
 
 
-	public void turtle_turn(float degrees) {
-		double n = degrees * Math.PI / 180.0;
-		double newx = Math.cos(n) * turtleDx + Math.sin(n) * turtleDy;
-		double newy = -Math.sin(n) * turtleDx + Math.cos(n) * turtleDy;
-		double len = Math.sqrt(newx * newx + newy * newy);
-		assert (len > 0);
-		turtleDx = (float) (newx / len);
-		turtleDy = (float) (newy / len);
-	}
-
-
-	public void turtle_goForward(Writer output,float stepSize) throws IOException {
-		//turtle_x += turtle_dx * distance;
-		//turtle_y += turtle_dy * distance;
-		//output.write(new String("G0 X"+(turtle_x)+" Y"+(turtle_y)+"\n").getBytes());
-		x += (turtleDx * (float)stepSize );
-		y += (turtleDy * (float)stepSize );
-		moveTo(output, x, y, false);
+	public void turtleMove(Writer output,float distance) throws IOException {
+		turtle.move(distance);
+		moveTo(output, turtle.getX(), turtle.getY(), false);
 	}
 }

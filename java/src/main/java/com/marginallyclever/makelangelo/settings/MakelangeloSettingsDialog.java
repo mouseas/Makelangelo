@@ -34,7 +34,6 @@ implements ActionListener {
    */
   private static final long serialVersionUID = 1L;
 
-  protected Translator translator;
   protected MakelangeloRobot robot;
 
   protected JTabbedPane panes;
@@ -47,10 +46,9 @@ implements ActionListener {
   protected int dialogWidth = 450;
   protected int dialogHeight = 500;
   
-  public MakelangeloSettingsDialog(Frame parent, Translator translator, MakelangeloRobot robot) {
+  public MakelangeloSettingsDialog(Frame parent, MakelangeloRobot robot) {
 	super(parent,Translator.get("configureMachine"),true);
 
-	this.translator = translator;
 	this.robot = robot;
   }
 
@@ -59,9 +57,9 @@ implements ActionListener {
   public void run() {
     panes = new JTabbedPane();
     
-    panelAdjustMachine = new PanelAdjustMachine(translator,robot);
-    panelAdjustPaper = new PanelAdjustPaper(translator,robot);
-    panelAdjustPen = robot.settings.getTool(0);
+    panelAdjustMachine = new PanelAdjustMachine(robot);
+    panelAdjustPaper = new PanelAdjustPaper(robot);
+    panelAdjustPen = robot.getSettings().getTool(0);
     //panelAdjustTools = new PanelAdjustTools(translator,robot);
     //panelSelectTool = new PanelSelectTool(translator,robot);
     
@@ -122,11 +120,14 @@ implements ActionListener {
 		  panelAdjustMachine.save();
 		  panelAdjustPaper.save();
 		  panelAdjustPen.save();
-		  robot.settings.saveConfig();
+		  robot.getSettings().saveConfig();
 		  robot.sendConfig();
 		  this.dispose();
 	  }
 	  if(src == cancel) {
+		  panelAdjustMachine.cancel();
+		  panelAdjustPaper.cancel();
+		  panelAdjustPen.cancel();
 		  this.dispose();
 		  return;
 	  }

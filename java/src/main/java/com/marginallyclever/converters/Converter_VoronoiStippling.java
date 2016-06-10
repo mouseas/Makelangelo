@@ -2,10 +2,10 @@ package com.marginallyclever.converters;
 
 import java.awt.GridLayout;
 import java.awt.Point;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
@@ -16,6 +16,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 
 import com.jogamp.opengl.GL2;
+import com.marginallyclever.basictypes.TransformedImage;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
 import com.marginallyclever.makelangelo.DrawPanelDecorator;
 import com.marginallyclever.makelangelo.Log;
@@ -40,8 +41,7 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 
 	private VoronoiTesselator voronoiTesselator = new VoronoiTesselator();
 	private VoronoiCell[] cells = new VoronoiCell[1];
-	private int w, h;
-	private BufferedImage src_img;
+	private TransformedImage sourceImage;
 	private List<VoronoiGraphEdge> graphEdges = null;
 	private static int MAX_GENERATIONS = 400;
 	private static int MAX_CELLS = 1000;
@@ -54,6 +54,8 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 	private double[] xValuesIn = null;
 	private double[] yValuesIn = null;
 
+	private float yBottom, yTop, xLeft, xRight;
+	
 
 	@Override
 	public String getName() {
@@ -61,7 +63,7 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 	}
 
 	@Override
-	public boolean convert(BufferedImage img,Writer out) throws IOException {
+	public boolean convert(TransformedImage img,Writer out) throws IOException {
 		JTextField text_gens = new JTextField(Integer.toString(MAX_GENERATIONS), 8);
 		JTextField text_cells = new JTextField(Integer.toString(MAX_CELLS), 8);
 		JTextField text_dot_max = new JTextField(Float.toString(MAX_DOT_SIZE), 8);
@@ -89,12 +91,14 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 			Filter_BlackAndWhite bw = new Filter_BlackAndWhite(255);
 			img = bw.filter(img);
 
-			src_img = img;
-			h = img.getHeight();
-			w = img.getWidth();
-
+			sourceImage = img;
+			
+			yBottom = (float)machine.getPaperBottom() * (float)machine.getPaperMargin() * 10;
+			yTop    = (float)machine.getPaperTop()    * (float)machine.getPaperMargin() * 10;
+			xLeft   = (float)machine.getPaperLeft()   * (float)machine.getPaperMargin() * 10;
+			xRight  = (float)machine.getPaperRight()  * (float)machine.getPaperMargin() * 10;
+			
 			tool = machine.getCurrentTool();
-			imageSetupTransform(img);
 
 			cellBorder = new ArrayList<>();
 
@@ -121,8 +125,8 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 		gl2.glColor3f(0.9f, 0.9f, 0.9f);
 		gl2.glBegin(GL2.GL_LINES);
 		for (VoronoiGraphEdge e : graphEdges) {
-			gl2.glVertex2d(TX((float) e.x1), TY((float) e.y1));
-			gl2.glVertex2d(TX((float) e.x2), TY((float) e.y2));
+			gl2.glVertex2d( e.x1, e.y1 );
+			gl2.glVertex2d( e.x2, e.y2 );
 		}
 		gl2.glEnd();
 
@@ -132,14 +136,16 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 		for (VoronoiCell c : cells) {
 			float x = (float)c.centroid.getX();
 			float y = (float)c.centroid.getY();
-			float val = 1.0f - (sample1x1(src_img, (int) x, (int) y) / 255.0f);
-			float r = (val * MAX_DOT_SIZE) / scale;
-			gl2.glBegin(GL2.GL_TRIANGLE_FAN);
-			for (float j = 0; j < Math.PI * 2; j += (Math.PI / 4)) {
-				gl2.glVertex2d(TX((float) (x + Math.cos(j) * r)),
-						TY((float) (y + Math.sin(j) * r)));
+			if( sourceImage.canSampleAt(x,y) ) {
+				float val = 1.0f - (sourceImage.sample1x1( x, y) / 255.0f);
+				float r = (val * MAX_DOT_SIZE);
+				gl2.glBegin(GL2.GL_TRIANGLE_FAN);
+				for (float j = 0; j < Math.PI * 2; j += (Math.PI / 4)) {
+					gl2.glVertex2d(x + Math.cos(j) * r,
+								   y + Math.sin(j) * r);
+				}
+				gl2.glEnd();
 			}
-			gl2.glEnd();
 		}
 
 		lock.unlock();
@@ -149,48 +155,25 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 	protected void initializeCells(double minDistanceBetweenSites) {
 		Log.write("green","Initializing cells");
 
-		double totalArea = w * h;
-		double pointArea = totalArea / (double) MAX_CELLS;
-		float length = (float) Math.sqrt(pointArea);
-		float x, y;
-
 		cells = new VoronoiCell[MAX_CELLS];
-		int used = 0;
-		int dir = 1;
 
-		try {
-
-
-			for (y = 0; y < h; y += length) {
-				if (dir == 1) {
-					for (x = 0; x < w; x += length) {
-						cells[used] = new VoronoiCell();
-						cells[used].centroid.setLocation(x+((float)Math.random()*length/2),y+((float)Math.random()*length/2));
-						//cells[used].centroid.setLocation(x, y);
-						++used;
-						if (used == MAX_CELLS) break;
-					}
-					dir = -1;
-				} else {
-					for (x = w - 1; x >= 0; x -= length) {
-						cells[used] = new VoronoiCell();
-						cells[used].centroid.setLocation((float)Math.random()*(float)w,(float)Math.random()*(float)h);
-						//cells[used].centroid.setLocation(x-((float)Math.random()*length/2),y-((float)Math.random()*length/2));
-						//cells[used].centroid.setLocation(x, y);
-						++used;
-						if (used == MAX_CELLS) break;
-					}
-					dir = 1;
-				}
-				if (used == MAX_CELLS) break;
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
+		// from top to bottom of the margin area...
+		float yBottom = (float)machine.getPaperBottom() * (float)machine.getPaperMargin() * 10;
+		float yTop    = (float)machine.getPaperTop()    * (float)machine.getPaperMargin() * 10;
+		float xLeft   = (float)machine.getPaperLeft()   * (float)machine.getPaperMargin() * 10;
+		float xRight  = (float)machine.getPaperRight()  * (float)machine.getPaperMargin() * 10;
+		
+		int used;
+		for (used=0;used<MAX_CELLS;++used) {
+			cells[used] = new VoronoiCell();
+			cells[used].centroid.setLocation(xLeft   + ((float)Math.random()*(xRight-xLeft)),
+											 yBottom + ((float)Math.random()*(yTop-yBottom))
+											 );
 		}
 
 		// convert the cells to sites used in the Voronoi class.
-		xValuesIn = new double[cells.length];
-		yValuesIn = new double[cells.length];
+		xValuesIn = new double[MAX_CELLS];
+		yValuesIn = new double[MAX_CELLS];
 
 		voronoiTesselator.Init(minDistanceBetweenSites);
 	}
@@ -205,19 +188,14 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 
 			int generation = 0;
 			do {
-				generation++;
+				++generation;
 				Log.write("green","Generation " + generation);
 
 				assert !lock.isHeldByCurrentThread();
 				lock.lock();
-				//try {
-					tessellateVoronoiDiagram();
-				//} finally {
-					lock.unlock();
-				//}
+				tessellateVoronoiDiagram();
+				lock.unlock();
 				adjustCentroids();
-
-				if(drawPanel != null) drawPanel.repaintNow();
 
 				// Do again if things are still moving a lot.  Cap the # of times so we don't have an infinite loop.
 			} while (generation < MAX_GENERATIONS);
@@ -232,66 +210,52 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 
 	// write cell centroids to gcode.
 	protected void writeOutCells(Writer out) throws IOException {
-		if (graphEdges != null) {
-			Log.write("green", "Writing gcode.");
+		if (graphEdges == null) return;
 
-			imageStart(src_img, out);
+		Log.write("green", "Writing gcode.");
 
-			// set absolute coordinates
-			out.write("G00 G90;\n");
-			tool.writeChangeTo(out);
-			liftPen(out);
+		imageStart(out);
+		liftPen(out);
 
-			float toolDiameter = tool.getDiameter();
+		float toolDiameter = tool.getDiameter();
 
-			int i;
+		Arrays.sort(cells);
+		
+		int i;
+		for (i = 0; i < cells.length; ++i) {
+			float x = cells[i].centroid.x;
+			float y = cells[i].centroid.y;
+			float val = 1.0f - (sourceImage.sample1x1(x,y) / 255.0f);
+			float r = val * MAX_DOT_SIZE;
+			if (r < MIN_DOT_SIZE) continue;
 
-			for (i = 0; i < cells.length; ++i) {
-				float x = cells[i].centroid.x;
-				float y = cells[i].centroid.y;
-				float val = 1.0f - (sample1x1(src_img,(int)x,(int)y) / 255.0f);
-				float r = val * MAX_DOT_SIZE;
-				if (r < MIN_DOT_SIZE) continue;
-				r /= scale;
-
-				float lastX=0,lastY=0;
-				boolean first=true;
-				// filled circles
-				while (r > toolDiameter) {
-					float detail = (float)Math.ceil(Math.PI * r / toolDiameter);
-					if (detail < 4) detail = 4;
-					if (detail > 20) detail = 20;
-					for (float j = 0; j <= detail; ++j) {
-						lastX = x + r * (float) Math.cos((float) Math.PI * 2.0f * j / detail);
-						lastY = y + r * (float) Math.sin((float) Math.PI * 2.0f * j / detail);
-						this.moveTo(out, lastX, lastY, first);
-						first=false;
+			float lastX=0,lastY=0;
+			boolean first=true;
+			// filled circles
+			while (r > 0) {
+				float detail = (float)Math.ceil(Math.PI * r / toolDiameter);
+				if (detail < 4) detail = 4;
+				if (detail > 20) detail = 20;
+				for (float j = 0; j <= detail; ++j) {
+					double v = Math.PI * 2.0f * j / detail;
+					lastX = x + r * (float) Math.cos(v);
+					lastY = y + r * (float) Math.sin(v);
+					if(first) {
+						moveTo(out, lastX, lastY, true);
+						lowerPen(out);
+					} else {
+						moveTo(out, lastX, lastY, false);
 					}
-					r -= toolDiameter;
+					first=false;
 				}
-				if(first == false) {
-					this.moveTo(out, x, y, false);
-					this.moveTo(out, x, y, true);
-				}
+				r -= toolDiameter;
 			}
-
-			liftPen(out);
+			if(first==false) {
+				liftPen(out);
+			}
 		}
 	}
 
-
-	/**
-	 * Overrides MoveTo() because optimizing for zigzag is different logic than straight lines.
-	 */
-	@Override
-	protected void moveTo(Writer out, float x, float y, boolean up) throws IOException {
-		if (lastUp != up) {
-			if (up) liftPen(out);
-			else lowerPen(out);
-			lastUp = up;
-		}
-		tool.writeMoveTo(out, TX(x), TY(y));
-	}
 
 
 	// I have a set of points.  I want a list of cell borders.
@@ -305,7 +269,7 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 		}
 
 		// scan left to right across the image, building the list of borders as we go.
-		graphEdges = voronoiTesselator.generateVoronoi(xValuesIn, yValuesIn, 0, w - 1, 0, h - 1);
+		graphEdges = voronoiTesselator.generateVoronoi(xValuesIn, yValuesIn, xLeft, xRight, yBottom, yTop);
 	}
 
 
@@ -426,7 +390,7 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 			for (y = sy; y <= ey; y += stepSize) {
 				for (x = sx; x <= ex; x += stepSize) {
 					if (insideBorder(x, y)) {
-						float val = (float) sample1x1(src_img, (int)x, (int)y) / 255.0f;
+						float val = (float) sourceImage.sample1x1( (float)x, (float)y ) / 255.0f;
 						val = 1.0f - val;
 						weight += val;
 						wx += x * val;
@@ -440,10 +404,10 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 			}
 
 			// make sure centroid can't leave image bounds
-			if (wx < 0) wx = 0;
-			if (wy < 0) wy = 0;
-			if (wx >= w) wx = w - 1;
-			if (wy >= h) wy = h - 1;
+			if (wx < xLeft) wx = xLeft;
+			if (wy < yBottom) wy = yBottom;
+			if (wx >= xRight) wx = xRight;
+			if (wy >= yTop) wy = yTop;
 
 			// use the new center
 			cells[i].centroid.setLocation(wx, wy);

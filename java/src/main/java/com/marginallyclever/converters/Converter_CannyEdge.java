@@ -1,10 +1,10 @@
 package com.marginallyclever.converters;
 
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.Writer;
 
+import com.marginallyclever.basictypes.TransformedImage;
 import com.marginallyclever.filters.Filter_BlackAndWhite;
 import com.marginallyclever.filters.Filter_Invert;
 import com.marginallyclever.makelangelo.Translator;
@@ -16,47 +16,12 @@ public class Converter_CannyEdge extends ImageConverter {
 		return Translator.get("CannyEdgeConverterName");
 	}
 
-	/**
-	 * Overrides MoveTo() because optimizing for zigzag is different logic than straight lines.
-	 */
-	@Override
-	protected void moveTo(Writer out, float x, float y, boolean up) throws IOException {
-		if (lastUp != up) {
-			if (up) liftPen(out);
-			else lowerPen(out);
-			lastUp = up;
-		}
-		tool.writeMoveTo(out, TX(x), TY(y));
-	}
-
-	// sample the pixels from x0,y0 (top left) to x1,y1 (bottom right)
-	protected int takeImageSampleBlock(BufferedImage img, int x0, int y0, int x1, int y1) {
-		// point sampling
-		int value = 0;
-		int sum = 0;
-
-		if (x0 < 0) x0 = 0;
-		if (x1 > imageWidth - 1) x1 = imageWidth - 1;
-		if (y0 < 0) y0 = 0;
-		if (y1 > imageHeight - 1) y1 = imageHeight - 1;
-
-		for (int y = y0; y < y1; ++y) {
-			for (int x = x0; x < x1; ++x) {
-				value += sample1x1(img, x, y);
-				++sum;
-			}
-		}
-
-		if (sum == 0) return 255;
-
-		return value / sum;
-	}
 
 	/**
 	 * turn the image into a grid of boxes.  box size is affected by source image darkness.
 	 * @param img the image to convert.
 	 */
-	public boolean convert(BufferedImage img,Writer out) throws IOException {
+	public boolean convert(TransformedImage img,Writer out) throws IOException {
 		// The picture might be in color.  Smash it to 255 shades of grey.
 		Filter_BlackAndWhite bw = new Filter_BlackAndWhite(255);
 		img = bw.filter(img);
@@ -69,10 +34,11 @@ public class Converter_CannyEdge extends ImageConverter {
 		detector.setHighThreshold(1f);
 
 		//apply it to an image
-		detector.setSourceImage(img);
+		detector.setSourceImage(img.getSourceImage());
 		detector.process();
-		BufferedImage edges = detector.getEdgesImage();
-
+		TransformedImage edges = new TransformedImage(detector.getEdgesImage());
+		edges.copySettingsFrom(img);
+		
 		Filter_Invert inv = new Filter_Invert();
 		edges = inv.filter(edges);
 		
@@ -103,7 +69,7 @@ public class Converter_CannyEdge extends ImageConverter {
 			++i;
 			if ((i % 2) == 0) {
 				// every even line move left to right
-				//MoveTo(file,x,y,pen up?)]
+				//lineTo(file,x,y,pen up?)]
 				for (x = 0; x < imageWidth - blockSize; x += blockSize) {
 					// read a block of the image and find the average intensity in this block
 					z = takeImageSampleBlock(img, (int) x, (int) (y - halfstep), (int) (x + blockSize), (int) (y + halfstep));
@@ -112,17 +78,17 @@ public class Converter_CannyEdge extends ImageConverter {
 					float pulse_size = (halfstep - 1.0f) * scale_z;
 					if (pulse_size > 0.1f) {
 						// draw a square.  the diameter is relative to the intensity.
-						moveTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, true);
-						moveTo(out, x + halfstep + pulse_size, y + halfstep - pulse_size, false);
-						moveTo(out, x + halfstep + pulse_size, y + halfstep + pulse_size, false);
-						moveTo(out, x + halfstep - pulse_size, y + halfstep + pulse_size, false);
-						moveTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, false);
-						moveTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, true);
+						lineTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, true);
+						lineTo(out, x + halfstep + pulse_size, y + halfstep - pulse_size, false);
+						lineTo(out, x + halfstep + pulse_size, y + halfstep + pulse_size, false);
+						lineTo(out, x + halfstep - pulse_size, y + halfstep + pulse_size, false);
+						lineTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, false);
+						lineTo(out, x + halfstep - pulse_size, y + halfstep - pulse_size, true);
 					}
 				}
 			} else {
 				// every odd line move right to left
-				//MoveTo(file,x,y,pen up?)]
+				//lineTo(file,x,y,pen up?)]
 				for (x = imageWidth - blockSize; x >= 0; x -= blockSize) {
 					// read a block of the image and find the average intensity in this block
 					z = takeImageSampleBlock(img, (int) (x - blockSize), (int) (y - halfstep), (int) x, (int) (y + halfstep));
@@ -131,12 +97,12 @@ public class Converter_CannyEdge extends ImageConverter {
 					float pulse_size = (halfstep - 1.0f) * scale_z;
 					if (pulse_size > 0.1f) {
 						// draw a square.  the diameter is relative to the intensity.
-						moveTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, true);
-						moveTo(out, x - halfstep + pulse_size, y + halfstep - pulse_size, false);
-						moveTo(out, x - halfstep + pulse_size, y + halfstep + pulse_size, false);
-						moveTo(out, x - halfstep - pulse_size, y + halfstep + pulse_size, false);
-						moveTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, false);
-						moveTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, true);
+						lineTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, true);
+						lineTo(out, x - halfstep + pulse_size, y + halfstep - pulse_size, false);
+						lineTo(out, x - halfstep + pulse_size, y + halfstep + pulse_size, false);
+						lineTo(out, x - halfstep - pulse_size, y + halfstep + pulse_size, false);
+						lineTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, false);
+						lineTo(out, x - halfstep - pulse_size, y + halfstep - pulse_size, true);
 					}
 				}
 			}

@@ -19,61 +19,56 @@ import com.marginallyclever.makelangelo.Translator;
  * @author dan royer
  */
 public final class MakelangeloRobotSettings {
+	public static final double INCH_TO_CM = 2.54;
 	/**
-	 *
+	 * measured from "m4 calibration.pdf"
+	 * @since 7.5.0
 	 */
-	private final Preferences topLevelMachinesPreferenceNode = PreferencesHelper.getPreferenceNode(PreferencesHelper.MakelangeloPreferenceKey.MACHINES);
-
-
-	public final static double INCH_TO_CM = 2.54;
-
-	public final String commonPaperSizes [] = { "---",
-			"4A0 (1682 x 2378)",
-			"2A0 (1189 x 1682)",
-			"A0 (841 x 1189)",
-			"A1 (594 x 841)",
-			"A2 (420 x 594)",
-			"A3 (297 x 420)",
-			"A4 (210 x 297)",
-			"A5 (148 x 210)",
-			"A6 (105 x 148)",
-			"A7 (74 x 105)",};
+	public static final float CALIBRATION_CM_FROM_TOP = 21.7f;
 	
+	private String[] configsAvailable;
 	
+	private int currentToolIndex;
+
+	// pulleys turning backwards?
+	private boolean isLeftMotorInverted;
+	private boolean isRegistered;
+	private boolean isRightMotorInverted;
+	private double limitBottom;
+
+	private double limitLeft;
+	private double limitRight;
+	// machine physical limits, in cm
+	private double limitTop;
+	private ArrayList<MakelangeloRobotSettingsListener> listeners;
+	private double maxAcceleration;
+
+	// maximum speed
+	private double maxFeedRate;
+	private double paperBottom;
+
+	private double paperLeft;
+	private double paperMargin;  // % from edge of paper.
+	
+	private double paperRight;
+	// paper area, in cm
+	private double paperTop;
+	
+	// pulley diameter
+	private double pulleyDiameterLeft;
+	
+	private double pulleyDiameterRight;
+	private boolean reverseForGlass;
+	
+
 	/**
 	 * Each robot has a global unique identifier
 	 */
-	private long robotUID = 0;
-
-	// machine physical limits
-	private double limitTop;
-	private double limitBottom;
-	private double limitLeft;
-	private double limitRight;
-
-	// paper area
-	private double paperTop;
-	private double paperBottom;
-	private double paperLeft;
-	private double paperRight;
-	private double paperMargin;
-
-	// pulleys turning backwards?
-	private boolean invertMotor1;
-	private boolean invertMotor2;
-
-	// pulley diameter
-	private double pulleyDiameterLeft;
-	private double pulleyDiameterRight;
+	private long robotUID;
 	
-	// maximum speed
-	private double maxFeedRate;
-	private double maxAcceleration;
-	
-	private boolean reverseForGlass;
-	
-	private boolean isRegistered = false;
-	private boolean shouldSignName = false;
+	// TODO leave the origin at the center of the paper and make a G92 (teleport) call when at the starting position
+
+	private boolean shouldSignName;
 
 	/**
 	 * top left, bottom center, etc...
@@ -93,34 +88,15 @@ public final class MakelangeloRobotSettings {
 	 * </pre>
 	 */
 	private int startingPositionIndex;
-	
-	// TODO leave the origin at the center of the paper and make a G92 (teleport) call when at the starting position
 
 	// TODO a way for users to create different tools for each machine
 	private List<DrawingTool> tools;
 
-	private int currentToolIndex;
+	/**
+	 *
+	 */
+	private final Preferences topLevelMachinesPreferenceNode = PreferencesHelper.getPreferenceNode(PreferencesHelper.MakelangeloPreferenceKey.MACHINES);
 
-	private String[] configsAvailable = null;
-
-	private ArrayList<MakelangeloRobotSettingsListener> listeners = new ArrayList<MakelangeloRobotSettingsListener>();
-
-	
-	
-	public void addListener(MakelangeloRobotSettingsListener listener) {
-		listeners.add(listener);
-	}
-	
-	public void removeListener(MakelangeloRobotSettingsListener listener) {
-		listeners.remove(listener);
-	}
-	
-	public void notifySettingsChanged() {
-		for( MakelangeloRobotSettingsListener listener : listeners ) {
-			listener.settingsChangedEvent(this);
-		}
-	}
-	
 	
 	
 	/**
@@ -133,30 +109,37 @@ public final class MakelangeloRobotSettings {
 		double mh = 835 * 0.1; // mm > cm
 		double mw = 835 * 0.1; // mm > cm
 		
+		robotUID = 0;
+		isRegistered = false;
 		limitTop = mh/2;
 		limitBottom = -mh/2;
 		limitRight = mw/2;
 		limitLeft = -mw/2;
 
-		// paper area
-		double pw = 420 * 0.1; // mm to cm
-		double ph = 594 * 0.1; // mm to cm
+		listeners = new ArrayList<MakelangeloRobotSettingsListener>();
+		shouldSignName = false;
 		
+		// paper area
+		double pw = 420 * 0.1; // cm
+		double ph = 594 * 0.1; // cm
+
 		paperTop = ph/2;
 		paperBottom = -ph/2;
 		paperLeft = -pw/2;
 		paperRight = pw/2;
 		paperMargin = 0.9;
 
-		maxFeedRate     = 7500;
+		maxFeedRate = 7500;
 		maxAcceleration = 20;
+
+		// diameter = circumference/pi
+		// circumference is 20 teeth @ 2mm/tooth
 		pulleyDiameterLeft  = 20.0 * 0.2 / Math.PI;  // 20 teeth on the pulley, 2mm per tooth.
 		pulleyDiameterRight = 20.0 * 0.2 / Math.PI;  // 20 teeth on the pulley, 2mm per tooth.
 
-		
-		invertMotor1       = false;
-		invertMotor2       = true;
-		reverseForGlass    = false;
+		isLeftMotorInverted = false;
+		isRightMotorInverted = true;
+		reverseForGlass = false;
 
 		startingPositionIndex = 4;
 		
@@ -176,7 +159,11 @@ public final class MakelangeloRobotSettings {
 		// Load most recent config
 		//loadConfig(last_machine_id);
 	}
-
+	
+	public void addListener(MakelangeloRobotSettingsListener listener) {
+		listeners.add(listener);
+	}
+	
 	public void createNewUID(long newUID) {
 		// make sure a topLevelMachinesPreferenceNode node is created
 		topLevelMachinesPreferenceNode.node(Long.toString(newUID));
@@ -189,40 +176,50 @@ public final class MakelangeloRobotSettings {
 	}
 	
 	
-	/**
-	 * Must match commonPaperSizes
-	 * @return
-	 */
-	public int getCurrentPaperSizeChoice(double pw,double ph) {
-		if( pw == 1682 && ph == 2378 ) return 1;
-		if( pw == 1189 && ph == 1682 ) return 2;
-		if( pw == 841 && ph == 1189 ) return 3;
-		if( pw == 594 && ph == 841 ) return 4;
-		if( pw == 420 && ph == 594 ) return 5;
-		if( pw == 297 && ph == 420 ) return 6;
-		if( pw == 210 && ph == 297 ) return 7;
-		if( pw == 148 && ph == 210 ) return 8;
-		if( pw == 105 && ph == 148 ) return 9;
-		if( pw == 74 && ph == 105 ) return 10;
+	
+	public double getAcceleration() {
+		return maxAcceleration;
+	}
 
+	/**
+	 * Get the UID of every machine this computer recognizes INCLUDING machine 0, which is only assigned temporarily when a machine is new or before the first software connect.
+	 *
+	 * @return an array of strings, each string is a machine UID.
+	 */
+	public String[] getAvailableConfigurations() {
+		return configsAvailable;
+	}
+	
+	
+	public String getBobbinLine() {
+		String left = String.format("%.4f", pulleyDiameterLeft);
+		String right = String.format("%.4f", pulleyDiameterRight);
+		return "D1 L" + left + " R" + right;
+	}
+
+	
+	public double getHomeX() {
 		return 0;
 	}
-
-
-	public String[] getToolNames() {
-		String[] toolNames = new String[tools.size()];
-		Iterator<DrawingTool> i = tools.iterator();
-		int c = 0;
-		while (i.hasNext()) {
-			DrawingTool t = i.next();
-			toolNames[c++] = t.getName();
-		}
-		return toolNames;
+	
+	public double getHomeY() {
+		float limitTop = (float)getLimitTop();
+		float homeY = limitTop - MakelangeloRobotSettings.CALIBRATION_CM_FROM_TOP;
+		homeY = (float)Math.floor(homeY*1000.0f)/1000.0f;
+		return homeY;
+	}
+	
+	public String getSetStartAtHomeLine() {
+		return "G92 X"+getHomeX()+" Y"+getHomeY();
 	}
 
-
-	public DrawingTool getTool(int tool_id) {
-		return tools.get(tool_id);
+	public String getConfigLine() {
+		return "M101 T" + limitTop
+				+ " B" + limitBottom
+				+ " L" + limitLeft
+				+ " R" + limitRight
+				+ " I" + (isLeftMotorInverted ? "-1" : "1")
+				+ " J" + (isRightMotorInverted ? "-1" : "1");
 	}
 
 
@@ -231,59 +228,25 @@ public final class MakelangeloRobotSettings {
 	}
 
 
-	/**
-	 * Load the machine configuration
-	 *
-	 * @param uid the unique id of the robot to be loaded
-	 */
-	protected void loadConfig(long uid) {
-		robotUID = uid;
-		// once cloud logic is finished.
-		//if( GetCanUseCloud() && LoadConfigFromCloud() ) return;
-		loadConfigFromLocal();
+	public int getCurrentToolNumber() {
+		return currentToolIndex;
 	}
 
-	protected void loadConfigFromLocal() {
-		final Preferences uniqueMachinePreferencesNode = topLevelMachinesPreferenceNode.node(Long.toString(robotUID));
-		limitTop = Double.valueOf(uniqueMachinePreferencesNode.get("limit_top", Double.toString(limitTop)));
-		limitBottom = Double.valueOf(uniqueMachinePreferencesNode.get("limit_bottom", Double.toString(limitBottom)));
-		limitLeft = Double.valueOf(uniqueMachinePreferencesNode.get("limit_left", Double.toString(limitLeft)));
-		limitRight = Double.valueOf(uniqueMachinePreferencesNode.get("limit_right", Double.toString(limitRight)));
+	public double getFeedRate() {
+		return maxFeedRate;
+	}
 
-		paperLeft=Double.parseDouble(uniqueMachinePreferencesNode.get("paper_left",Double.toString(paperLeft)));
-		paperRight=Double.parseDouble(uniqueMachinePreferencesNode.get("paper_right",Double.toString(paperRight)));
-		paperTop=Double.parseDouble(uniqueMachinePreferencesNode.get("paper_top",Double.toString(paperTop)));
-		paperBottom=Double.parseDouble(uniqueMachinePreferencesNode.get("paper_bottom",Double.toString(paperBottom)));
 
-		invertMotor1=Boolean.parseBoolean(uniqueMachinePreferencesNode.get("m1invert", Boolean.toString(invertMotor1)));
-		invertMotor2=Boolean.parseBoolean(uniqueMachinePreferencesNode.get("m2invert", Boolean.toString(invertMotor2)));
-
-		pulleyDiameterLeft=Double.valueOf(uniqueMachinePreferencesNode.get("bobbin_left_diameter", Double.toString(pulleyDiameterLeft)));
-		pulleyDiameterRight=Double.valueOf(uniqueMachinePreferencesNode.get("bobbin_right_diameter", Double.toString(pulleyDiameterRight)));
-
-		maxFeedRate=Double.valueOf(uniqueMachinePreferencesNode.get("feed_rate",Double.toString(maxFeedRate)));
-		maxAcceleration=Double.valueOf(uniqueMachinePreferencesNode.get("acceleration",Double.toString(maxAcceleration)));
-
-		startingPositionIndex = Integer.valueOf(uniqueMachinePreferencesNode.get("startingPosIndex",Integer.toString(startingPositionIndex)));
-
-		// load each tool's settings
-		for (DrawingTool tool : tools) {
-			tool.loadConfig(uniqueMachinePreferencesNode);
+	public int getKnownMachineIndex() {
+		String [] list = getKnownMachineNames();
+		for (int i = 0; i < list.length; i++) {
+			if (list[i].equals("0")) continue;
+			if (list[i].equals(Long.toString(robotUID))) {
+				return i;
+			}
 		}
 
-		paperMargin = Double.valueOf(uniqueMachinePreferencesNode.get("paper_margin", Double.toString(paperMargin)));
-		reverseForGlass = Boolean.parseBoolean(uniqueMachinePreferencesNode.get("reverseForGlass", Boolean.toString(reverseForGlass)));
-		setCurrentToolNumber(Integer.valueOf(uniqueMachinePreferencesNode.get("current_tool", Integer.toString(getCurrentToolNumber()))));
-		setRegistered(Boolean.parseBoolean(uniqueMachinePreferencesNode.get("isRegistered",Boolean.toString(isRegistered))));
-	}
-
-
-	// Save the machine configuration
-	public void saveConfig() {
-		// once cloud logic is finished.
-		//if(GetCanUseCloud() && SaveConfigToCloud() ) return;
-		saveConfigToLocal();
-		notifySettingsChanged();
+		return -1;
 	}
 
 	/*
@@ -325,14 +288,220 @@ public final class MakelangeloRobotSettings {
 	 */
 
 
+	/**
+	 * Get the UID of every machine this computer recognizes EXCEPT machine 0, which is only assigned temporarily when a machine is new or before the first software connect.
+	 *
+	 * @return an array of strings, each string is a machine UID.
+	 */
+	public String[] getKnownMachineNames() {
+		final List<String> thissAvailableArrayAsList = new LinkedList<>(Arrays.asList(configsAvailable));
+		if (thissAvailableArrayAsList.contains("0")) {
+			thissAvailableArrayAsList.remove("0");
+		}
+		return Arrays.copyOf(thissAvailableArrayAsList.toArray(), thissAvailableArrayAsList.size(), String[].class);
+	}
+
+
+	public double getLimitBottom() {
+		return limitBottom;
+	}
+
+
+	public double getLimitLeft() {
+		return limitLeft;
+	}
+
+
+	public double getLimitRight() {
+		return limitRight;
+	}
+
+	public double getLimitTop() {
+		return limitTop;
+	}
+
+	/**
+	 * @return the number of machine configurations that exist on this computer
+	 */
+	public int getMachineCount() {
+		return configsAvailable.length;
+	}
+
+
+	public double getPaperBottom() {
+		return paperBottom;
+	}
+
+
+	/**
+	 * @return paper height, in cm.
+	 */
+	public double getPaperHeight() {
+		return paperTop - paperBottom;
+	}
+
+	public double getPaperLeft() {
+		return paperLeft;
+	}
+
+
+	public double getPaperMargin() {
+		return paperMargin;
+	}
+
+
+	public double getPaperRight() {
+		return paperRight;
+	}
+
+
+	public double getPaperTop() {
+		return paperTop;
+	}
+
+
+	/**
+	 * @return paper width, in cm.
+	 */
+	public double getPaperWidth() {
+		return paperRight - paperLeft;
+	}
+
+	public String getPenDownString() {
+		return Float.toString(getCurrentTool().getPenDownAngle());
+	}
+	
+	public String getPenUpString() {
+		return Float.toString(getCurrentTool().getPenUpAngle());
+	}
+
+	public double getPulleyDiameterLeft()  {
+		return pulleyDiameterLeft;
+	}
+
+	public double getPulleyDiameterRight() {
+		return pulleyDiameterRight;
+	}
+
+	public DrawingTool getTool(int tool_id) {
+		return tools.get(tool_id);
+	}
+	
+	public String[] getToolNames() {
+		String[] toolNames = new String[tools.size()];
+		Iterator<DrawingTool> i = tools.iterator();
+		int c = 0;
+		while (i.hasNext()) {
+			DrawingTool t = i.next();
+			toolNames[c++] = t.getName();
+		}
+		return toolNames;
+	}
+
+	public long getUID() {
+		return robotUID;
+	}
+
+	public void invertLeftMotor(boolean backwards)  {
+		isLeftMotorInverted = backwards;
+	}
+
+	public void invertRightMotor(boolean backwards) {
+		isRightMotorInverted = backwards;
+	}
+
+	public boolean isLeftMotorInverted()   {
+		return isLeftMotorInverted;
+	}
+
+	public boolean isPaperConfigured() {
+		return (paperTop > paperBottom && paperRight > paperLeft);
+	}
+
+	public boolean isRegistered() {
+		return isRegistered;
+	}
+
+	public boolean isReverseForGlass() {
+		return reverseForGlass;
+	}
+
+	public boolean isRightMotorInverted() {
+		return isRightMotorInverted;
+	}
+
+	/**
+	 * Load the machine configuration
+	 *
+	 * @param uid the unique id of the robot to be loaded
+	 */
+	protected void loadConfig(long uid) {
+		robotUID = uid;
+		// once cloud logic is finished.
+		//if( GetCanUseCloud() && LoadConfigFromCloud() ) return;
+		loadConfigFromLocal();
+	}
+
+	protected void loadConfigFromLocal() {
+		final Preferences uniqueMachinePreferencesNode = topLevelMachinesPreferenceNode.node(Long.toString(robotUID));
+		limitTop    = Double.valueOf(uniqueMachinePreferencesNode.get("limit_top", Double.toString(limitTop)));
+		limitBottom = Double.valueOf(uniqueMachinePreferencesNode.get("limit_bottom", Double.toString(limitBottom)));
+		limitLeft   = Double.valueOf(uniqueMachinePreferencesNode.get("limit_left", Double.toString(limitLeft)));
+		limitRight  = Double.valueOf(uniqueMachinePreferencesNode.get("limit_right", Double.toString(limitRight)));
+
+		paperLeft   = Double.parseDouble(uniqueMachinePreferencesNode.get("paper_left",Double.toString(paperLeft)));
+		paperRight  = Double.parseDouble(uniqueMachinePreferencesNode.get("paper_right",Double.toString(paperRight)));
+		paperTop    = Double.parseDouble(uniqueMachinePreferencesNode.get("paper_top",Double.toString(paperTop)));
+		paperBottom = Double.parseDouble(uniqueMachinePreferencesNode.get("paper_bottom",Double.toString(paperBottom)));
+
+		isLeftMotorInverted=Boolean.parseBoolean(uniqueMachinePreferencesNode.get("m1invert", Boolean.toString(isLeftMotorInverted)));
+		isRightMotorInverted=Boolean.parseBoolean(uniqueMachinePreferencesNode.get("m2invert", Boolean.toString(isRightMotorInverted)));
+
+		pulleyDiameterLeft=Double.valueOf(uniqueMachinePreferencesNode.get("bobbin_left_diameter", Double.toString(pulleyDiameterLeft)));
+		pulleyDiameterRight=Double.valueOf(uniqueMachinePreferencesNode.get("bobbin_right_diameter", Double.toString(pulleyDiameterRight)));
+
+		maxFeedRate=Double.valueOf(uniqueMachinePreferencesNode.get("feed_rate",Double.toString(maxFeedRate)));
+		maxAcceleration=Double.valueOf(uniqueMachinePreferencesNode.get("acceleration",Double.toString(maxAcceleration)));
+
+		startingPositionIndex = Integer.valueOf(uniqueMachinePreferencesNode.get("startingPosIndex",Integer.toString(startingPositionIndex)));
+
+		// load each tool's settings
+		for (DrawingTool tool : tools) {
+			tool.loadConfig(uniqueMachinePreferencesNode);
+		}
+
+		paperMargin = Double.valueOf(uniqueMachinePreferencesNode.get("paper_margin", Double.toString(paperMargin)));
+		reverseForGlass = Boolean.parseBoolean(uniqueMachinePreferencesNode.get("reverseForGlass", Boolean.toString(reverseForGlass)));
+		setCurrentToolNumber(Integer.valueOf(uniqueMachinePreferencesNode.get("current_tool", Integer.toString(getCurrentToolNumber()))));
+		setRegistered(Boolean.parseBoolean(uniqueMachinePreferencesNode.get("isRegistered",Boolean.toString(isRegistered))));
+	}
+
+	public void notifySettingsChanged() {
+		for( MakelangeloRobotSettingsListener listener : listeners ) {
+			listener.settingsChangedEvent(this);
+		}
+	}
+
+	public void removeListener(MakelangeloRobotSettingsListener listener) {
+		listeners.remove(listener);
+	}
+	
+	// Save the machine configuration
+	public void saveConfig() {
+		// once cloud logic is finished.
+		//if(GetCanUseCloud() && SaveConfigToCloud() ) return;
+		saveConfigToLocal();
+		notifySettingsChanged();
+	}
+	
 	protected void saveConfigToLocal() {
 		final Preferences uniqueMachinePreferencesNode = topLevelMachinesPreferenceNode.node(Long.toString(robotUID));
 		uniqueMachinePreferencesNode.put("limit_top", Double.toString(limitTop));
 		uniqueMachinePreferencesNode.put("limit_bottom", Double.toString(limitBottom));
 		uniqueMachinePreferencesNode.put("limit_right", Double.toString(limitRight));
 		uniqueMachinePreferencesNode.put("limit_left", Double.toString(limitLeft));
-		uniqueMachinePreferencesNode.put("m1invert", Boolean.toString(invertMotor1));
-		uniqueMachinePreferencesNode.put("m2invert", Boolean.toString(invertMotor2));
+		uniqueMachinePreferencesNode.put("m1invert", Boolean.toString(isLeftMotorInverted));
+		uniqueMachinePreferencesNode.put("m2invert", Boolean.toString(isRightMotorInverted));
 		uniqueMachinePreferencesNode.put("bobbin_left_diameter", Double.toString(pulleyDiameterLeft));
 		uniqueMachinePreferencesNode.put("bobbin_right_diameter", Double.toString(pulleyDiameterRight));
 		uniqueMachinePreferencesNode.put("feed_rate", Double.toString(maxFeedRate));
@@ -355,184 +524,42 @@ public final class MakelangeloRobotSettings {
 		uniqueMachinePreferencesNode.put("isRegistered", Boolean.toString(isRegistered));
 		
 	}
-
-
-	public String getBobbinLine() {
-		String left = String.format("%.4f", pulleyDiameterLeft);
-		String right = String.format("%.4f", pulleyDiameterRight);
-		return "D1 L" + left + " R" + right;
-	}
-
-
-	public String getConfigLine() {
-		return "M101 T" + limitTop
-				+ " B" + limitBottom
-				+ " L" + limitLeft
-				+ " R" + limitRight
-				+ " I" + (invertMotor1 ? "-1" : "1")
-				+ " J" + (invertMotor2 ? "-1" : "1");
-	}
-
-
-	public String getPenUpString() {
-		return Float.toString(getCurrentTool().getZOff());
-	}
-
-	public String getPenDownString() {
-		return Float.toString(getCurrentTool().getZOn());
-	}
-
-	public boolean isPaperConfigured() {
-		return (paperTop > paperBottom && paperRight > paperLeft);
-	}
-
-
-	/**
-	 * @return the number of machine configurations that exist on this computer
-	 */
-	public int getMachineCount() {
-		return configsAvailable.length;
-	}
-
-
-	/**
-	 * Get the UID of every machine this computer recognizes EXCEPT machine 0, which is only assigned temporarily when a machine is new or before the first software connect.
-	 *
-	 * @return an array of strings, each string is a machine UID.
-	 */
-	public String[] getKnownMachineNames() {
-		final List<String> thissAvailableArrayAsList = new LinkedList<>(Arrays.asList(configsAvailable));
-		if (thissAvailableArrayAsList.contains("0")) {
-			thissAvailableArrayAsList.remove("0");
-		}
-		return Arrays.copyOf(thissAvailableArrayAsList.toArray(), thissAvailableArrayAsList.size(), String[].class);
-	}
-
-	/**
-	 * Get the UID of every machine this computer recognizes INCLUDING machine 0, which is only assigned temporarily when a machine is new or before the first software connect.
-	 *
-	 * @return an array of strings, each string is a machine UID.
-	 */
-	public String[] getAvailableConfigurations() {
-		return configsAvailable;
-	}
-
-
-	public int getKnownMachineIndex() {
-		String [] list = getKnownMachineNames();
-		for (int i = 0; i < list.length; i++) {
-			if (list[i].equals("0")) continue;
-			if (list[i].equals(Long.toString(robotUID))) {
-				return i;
-			}
-		}
-
-		return -1;
-	}
-
-
-	public double getPaperWidth() {
-		return paperRight - paperLeft;
-	}
-
-
-	public double getPaperHeight() {
-		return paperTop - paperBottom;
-	}
-
-
-	public double getPaperScale() {
-		double paper_w = getPaperWidth();
-		double paper_h = getPaperHeight();
-
-		if (paper_w > paper_h) {
-			return paper_h / paper_w;
-		} else {
-			return paper_w / paper_h;
-		}
-	}
-
-	public double getFeedRate() {
-		return maxFeedRate;
-	}
-
-	public void setFeedRate(double f) {
-		maxFeedRate = f;
-		saveConfig();
-	}
 	
-	public double getAcceleration() {
-		return maxAcceleration;
-	}
-
 	public void setAcceleration(double f) {
 		maxAcceleration = f;
 		saveConfig();
 	}
-
-	public long getUID() {
-		return robotUID;
-	}
-
+	
 	public void setCurrentToolNumber(int current_tool) {
 		this.currentToolIndex = current_tool;
 	}
-	public int getCurrentToolNumber() {
-		return currentToolIndex;
+	
+	public void setFeedRate(double f) {
+		maxFeedRate = f;
+		saveConfig();
 	}
-
-	public boolean isReverseForGlass() {
-		return reverseForGlass;
-	}
-
-	public void setReverseForGlass(boolean reverseForGlass) {
-		this.reverseForGlass = reverseForGlass;
-	}
-
-	public double getLimitTop() {
-		return limitTop;
-	}
-
-	public void setLimitTop(double limitTop) {
-		this.limitTop = limitTop;
-	}
-
-	public double getLimitBottom() {
-		return limitBottom;
-	}
-
 	public void setLimitBottom(double limitBottom) {
 		this.limitBottom = limitBottom;
 	}
-
-	public double getLimitLeft() {
-		return limitLeft;
-	}
-
 	public void setLimitLeft(double limitLeft) {
 		this.limitLeft = limitLeft;
 	}
-
-	public double getLimitRight() {
-		return limitRight;
-	}
-
 	public void setLimitRight(double limitRight) {
 		this.limitRight = limitRight;
 	}
-
-	public double getPaperMargin() {
-		return paperMargin;
+	public void setLimitTop(double limitTop) {
+		this.limitTop = limitTop;
 	}
-
+	public void setMachineSize(double width, double height) {
+		this.limitLeft = -width/2.0;
+		this.limitRight = width/2.0;
+		this.limitBottom = -height/2.0;
+		this.limitTop = height/2.0;
+	}
 	public void setPaperMargin(double paperMargin) {
 		this.paperMargin = paperMargin;	
 	}
-	
-	public boolean shouldSignName() {
-		return shouldSignName;
-	}
-	
+
 	public void setPaperSize(double width, double height) {
 		this.paperLeft = -width/2;
 		this.paperRight = width/2;
@@ -540,109 +567,17 @@ public final class MakelangeloRobotSettings {
 		this.paperBottom = -height/2;
 	}
 	
-	public void setMachineSize(double width, double height) {
-		this.limitLeft = -width/2.0;
-		this.limitRight = width/2.0;
-		this.limitBottom = -height/2.0;
-		this.limitTop = height/2.0;
-	}
-	
-	public void setStartingPositionIndex(int index) {
-      	this.startingPositionIndex = index;
-      	double pwf = this.getPaperWidth();
-      	double phf = this.getPaperHeight();
-      	double mwf = this.getLimitRight() - this.getLimitRight();
-      	double mhf = this.getLimitTop() - this.getLimitBottom();
-      	
-        // relative to paper limits
-        switch (this.startingPositionIndex % 3) {
-          case 0:
-          	this.paperLeft = 0;
-          	this.paperRight = pwf;
-          	this.setLimitLeft( -(mwf - pwf) / 2.0f );
-          	this.setLimitRight( (mwf - pwf) / 2.0f + pwf );
-            break;
-          case 1:
-          	this.paperLeft = -pwf / 2.0f;
-          	this.paperRight = pwf / 2.0f;
-          	this.setLimitLeft( -mwf / 2.0f );
-          	this.setLimitRight( mwf / 2.0f );
-            break;
-          case 2:
-          	this.paperRight = 0;
-            this.paperLeft = -pwf;
-            this.setLimitLeft( -pwf - (mwf - pwf) / 2.0f );
-            this.setLimitRight( (mwf - pwf) / 2.0f );
-            break;
-        }
-        switch (this.startingPositionIndex / 3) {
-          case 0:
-          	this.paperTop = 0;
-	            this.paperBottom = -phf;
-	            this.setLimitTop( (mhf - phf) / 2.0f );
-	            this.setLimitBottom( -phf - (mhf - phf) / 2.0f );
-            break;
-          case 1:
-          	this.paperTop = phf / 2.0f;
-          	this.paperBottom = -phf / 2.0f;
-          	this.setLimitTop( mhf / 2.0f );
-          	this.setLimitBottom( -mhf / 2.0f );
-            break;
-          case 2:
-          	this.paperBottom = 0;
-          	this.paperTop = phf;
-            this.setLimitTop( phf + (mhf - phf) / 2.0f );
-            this.setLimitBottom( -(mhf - phf) / 2.0f );
-            break;
-        }
-	}
-	
 	public void setPulleyDiameter(double left,double right) {
 		pulleyDiameterLeft = left;
 		pulleyDiameterRight = right;
 	}
-	
-	public double getPulleyDiameterLeft() {
-		return pulleyDiameterLeft;
-	}
-	public double getPulleyDiameterRight() {
-		return pulleyDiameterRight;
-	}
-	public boolean isMotor1Backwards() {
-		return invertMotor1;
-	}
-	public boolean isMotor2Backwards() {
-		return invertMotor2;
-	}
-	public void setMotor1Backwards(boolean backwards) {
-		invertMotor1 = backwards;
-	}
-	public void setMotor2Backwards(boolean backwards) {
-		invertMotor2 = backwards;
-	}
-	
-	public boolean isRegistered() {
-		return isRegistered;
-	}
-
 	public void setRegistered(boolean isRegistered) {
 		this.isRegistered = isRegistered;
 	}
-	
-	public double getPaperTop() {
-		return paperTop;
+	public void setReverseForGlass(boolean reverseForGlass) {
+		this.reverseForGlass = reverseForGlass;
 	}
-
-	public double getPaperBottom() {
-		return paperBottom;
+	public boolean shouldSignName() {
+		return shouldSignName;
 	}
-
-	public double getPaperLeft() {
-		return paperLeft;
-	}
-
-	public double getPaperRight() {
-		return paperRight;
-	}
-
 }
