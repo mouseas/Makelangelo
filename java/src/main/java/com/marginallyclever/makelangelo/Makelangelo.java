@@ -58,6 +58,7 @@ import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettingsListener;
 
 
 /**
+ * The root window of the GUI
  * @author danroyer
  * @author Peter Colapietro
  * @since 0.0.1?
@@ -116,6 +117,9 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 	
 	
 	public static void main(String[] argv) {
+		Log.clear();
+		CommandLineOptions.setFromMain(argv);
+		
 		//Schedule a job for the event-dispatching thread:
 		//creating and showing this application's GUI.
 		javax.swing.SwingUtilities.invokeLater(new Runnable() {
@@ -127,13 +131,11 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 
 
 	public Makelangelo() {
-		Log.clear();
-
 		Translator.start();
 		SoundSystem.start();
 		
 		// create a robot and listen to it for important news
-		robot = new MakelangeloRobot(translator);
+		robot = new MakelangeloRobot();
 		robot.addListener(this);
 		robot.getSettings().addListener(this);
 		
@@ -144,6 +146,14 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 		createAndShowGUI();
 
 		if (prefs.getBoolean("Check for updates", false)) checkForUpdate();
+		
+		loadGraphicsSettings();
+	}
+	
+	// load settings and apply them.
+	protected void loadGraphicsSettings() {
+		final Preferences graphics_prefs = PreferencesHelper.getPreferenceNode(PreferencesHelper.MakelangeloPreferenceKey.GRAPHICS);
+		robot.setShowPenUp(graphics_prefs.getBoolean("show pen up", false));
 	}
 	
 	
@@ -343,7 +353,7 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 	 */
 	public void checkForUpdate() {
 		try {
-			URL github = new URL("https://github.com/MarginallyClever/Makelangelo/releases/latest");
+			URL github = new URL("https://github.com/MarginallyClever/Makelangelo-Software/releases/latest");
 			HttpURLConnection conn = (HttpURLConnection) github.openConnection();
 			conn.setInstanceFollowRedirects(false);  //you still need to handle redirect manully.
 			HttpURLConnection.setFollowRedirects(false);
@@ -357,17 +367,19 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 				int start = inputLine.indexOf(matchStart);
 				int end = inputLine.indexOf(matchEnd);
 				if (start != -1 && end != -1) {
-					inputLine = inputLine.substring(start + matchStart.length(), end);
+					String line2 = inputLine.substring(start + matchStart.length(), end);
 					// parse the last part of the redirect URL, which contains the release tag (which is the VERSION)
-					inputLine = inputLine.substring(inputLine.lastIndexOf("/") + 1);
+					line2 = line2.substring(line2.lastIndexOf("/") + 1);
 
-					System.out.println("latest release: " + inputLine+"; this version: " + VERSION);
+					System.out.println("latest release: " + line2+"; this version: " + VERSION);
 					//System.out.println(inputLine.compareTo(VERSION));
 
-					int comp = inputLine.compareTo(VERSION);
+					int comp = line2.compareTo(VERSION);
 					String results;
-					if     (comp>0) results = Translator.get("UpdateNotice");
-					else if(comp<0) results = "This version is from the future?!";
+					if     (comp>0) {
+						results = Translator.get("UpdateNotice");
+						//TODO downloadUpdate();
+					} else if(comp<0) results = "This version is from the future?!";
 					else 			results = Translator.get("UpToDate");
 
 					JOptionPane.showMessageDialog(mainFrame, results);
@@ -381,6 +393,21 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 		}
 	}
 
+	
+	/**
+	 * See http://www.dreamincode.net/forums/topic/190944-creating-an-updater-in-java/
+	 *//*
+	private void downloadUpdate() {
+		String[] run = {"java","-jar","updater/update.jar"};
+        try {
+            Runtime.getRuntime().exec(run);
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        System.exit(0);
+	}*/
+	
+	
 	/**
 	 * Rebuild the contents of the menu based on current program state
 	 */
@@ -464,9 +491,12 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 		mainFrame.setJMenuBar(createMenuBar());
 		mainFrame.setContentPane(createContentPane());
 		
+		// add the drag & drop support
 		mainFrame.setTransferHandler(myTransferHandler);
 		
+		// adjust the window size
 		setupFrameRealEstate();
+		
 		mainFrame.setVisible(true);
 
 		drawPanel.zoomToFitPaper();
@@ -486,32 +516,27 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 		
 		// Get default screen size
 		Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-		if( screenSize.width > 0 && screenSize.width < maxWidth ) {
-			maxHeight *= screenSize.width / maxWidth;
-			maxWidth = screenSize.width;
-		}
-		if( screenSize.height > 0 && screenSize.height < maxHeight ) {
-			maxWidth *= screenSize.height / maxHeight;
-			maxHeight = screenSize.height;
-		}
-			
-		// set window size
+		maxWidth = screenSize.width;
+		maxHeight = screenSize.height;
+
+		// Set window size
 		if(width > maxWidth || height > maxHeight ) {
 			width = maxWidth;
 			height = maxHeight;
 			prefs.putInt("Default window width", maxWidth );
 			prefs.putInt("Default window height", maxHeight );
 		}
-		
+
 		mainFrame.setSize(width, height);
 		
-		// set window location
+		// Set window location
 		// by default center the window.  Later use preferences.
 		int defaultLocationX = (screenSize.width - width) / 2;
 		int defaultLocationY = (screenSize.height - height) / 2;
-		int locationX = prefs.getInt("Default window location x", defaultLocationX);
-		int locationY = prefs.getInt("Default window location y", defaultLocationY);
-		mainFrame.setLocation(locationX,locationY);
+		mainFrame.setLocation(defaultLocationX,defaultLocationY);
+		//int locationX = prefs.getInt("Default window location x", defaultLocationX);
+		//int locationY = prefs.getInt("Default window location y", defaultLocationY);
+		//mainFrame.setLocation(locationX,locationY);
 	}
 	
 
@@ -528,6 +553,11 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 		drawPanel.repaint();
 	}
 	
+	
+	@Override
+	public void firmwareBad(MakelangeloRobot r,long versionFound) {
+        JOptionPane.showMessageDialog(mainFrame, Translator.get("firmwareVersionBadMessage"), Translator.get("firmwareVersionBadTitle"), JOptionPane.ERROR_MESSAGE);
+	}
 	
 	@Override
 	public void dataAvailable(MakelangeloRobot r,String data) {
@@ -624,9 +654,7 @@ implements ActionListener, WindowListener, MakelangeloRobotListener, Makelangelo
 
 
 	@Override
-	public void windowClosed(WindowEvent e) {
-		System.out.println("windowClosed");
-	}
+	public void windowClosed(WindowEvent e) {}
 }
 
 

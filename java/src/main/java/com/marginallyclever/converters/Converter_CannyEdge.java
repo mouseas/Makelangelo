@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.io.Writer;
 
 import com.marginallyclever.basictypes.TransformedImage;
-import com.marginallyclever.filters.Filter_BlackAndWhite;
-import com.marginallyclever.filters.Filter_Invert;
+import com.marginallyclever.imageFilters.Filter_BlackAndWhite;
+import com.marginallyclever.imageFilters.Filter_Invert;
 import com.marginallyclever.makelangelo.Translator;
 
 
@@ -108,9 +108,8 @@ public class Converter_CannyEdge extends ImageConverter {
 			}
 
 			liftPen(out);
-
-			tool.writeMoveTo(out, 0, 0);
-		}*/
+		    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
+	    }*/
 		return true;
 	}
 }

@@ -31,7 +31,7 @@ import com.marginallyclever.makelangelo.Log;
 import com.marginallyclever.makelangelo.Translator;
 
 
-public class Generator_YourMessageHere extends ImageGenerator {
+public class Generator_Text extends ImageGenerator {
 	// text properties
 	private float kerning = 5.0f;
 	private float letterWidth = 10.0f;
@@ -60,7 +60,7 @@ public class Generator_YourMessageHere extends ImageGenerator {
 	private static Font [] fontList;
 	private static String [] fontNames;
 
-	public Generator_YourMessageHere() {		
+	public Generator_Text() {		
 		// build list of fonts
 		GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
 		fontList = ge.getAllFonts();
@@ -285,6 +285,9 @@ public class Generator_YourMessageHere extends ImageGenerator {
 
 	private void createMessage(String fontName, int fontSize, String str, Writer out) throws IOException {
 		imageStart(out);
+		tool = machine.getCurrentTool();
+		liftPen(out);
+		tool.writeChangeTo(out);
 
 		posx=0;
 		posy=0;
@@ -302,6 +305,8 @@ public class Generator_YourMessageHere extends ImageGenerator {
 						(float)((machine.getPaperHeight()/2.0f)*10.0f*machine.getPaperMargin()));
 		textCreateMessageNow(lastMessage, out);
 */
+		liftPen(out);
+	    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
 	}
 	public void textSetPosition(float x, float y) {
 		posx = x;

@@ -17,7 +17,7 @@ import javax.swing.JTextField;
 
 import com.jogamp.opengl.GL2;
 import com.marginallyclever.basictypes.TransformedImage;
-import com.marginallyclever.filters.Filter_BlackAndWhite;
+import com.marginallyclever.imageFilters.Filter_BlackAndWhite;
 import com.marginallyclever.makelangelo.DrawPanelDecorator;
 import com.marginallyclever.makelangelo.Log;
 import com.marginallyclever.makelangelo.Translator;
@@ -212,10 +212,12 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 	protected void writeOutCells(Writer out) throws IOException {
 		if (graphEdges == null) return;
 
-		Log.write("green", "Writing gcode.");
+		Log.message("Writing gcode.");
 
 		imageStart(out);
+		tool = machine.getCurrentTool();
 		liftPen(out);
+		tool.writeChangeTo(out);
 
 		float toolDiameter = tool.getDiameter();
 
@@ -229,24 +231,24 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 			float r = val * MAX_DOT_SIZE;
 			if (r < MIN_DOT_SIZE) continue;
 
-			float lastX=0,lastY=0;
+			float newX=0,newY=0;
 			boolean first=true;
 			// filled circles
 			while (r > 0) {
-				float detail = (float)Math.ceil(Math.PI * r / toolDiameter);
+				float detail = (float)Math.ceil(Math.PI * r*2 / (toolDiameter*4));
 				if (detail < 4) detail = 4;
 				if (detail > 20) detail = 20;
 				for (float j = 0; j <= detail; ++j) {
 					double v = Math.PI * 2.0f * j / detail;
-					lastX = x + r * (float) Math.cos(v);
-					lastY = y + r * (float) Math.sin(v);
+					newX = x + r * (float) Math.cos(v);
+					newY = y + r * (float) Math.sin(v);
 					if(first) {
-						moveTo(out, lastX, lastY, true);
+						moveTo(out, newX, newY, true);
 						lowerPen(out);
+						first=false;
 					} else {
-						moveTo(out, lastX, lastY, false);
+						moveTo(out, newX, newY, false);
 					}
-					first=false;
 				}
 				r -= toolDiameter;
 			}
@@ -254,6 +256,9 @@ public class Converter_VoronoiStippling extends ImageConverter implements DrawPa
 				liftPen(out);
 			}
 		}
+		
+		liftPen(out);
+	    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
 	}
 
 

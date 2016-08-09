@@ -105,8 +105,10 @@ public class GCodeFile {
 		estimatedLength = 0;
 		estimateCount = 0;
 
+		int lineCount=0;
 		Iterator<String> iLine = lines.iterator();
 		while (iLine.hasNext()) {
+			lineCount++;
 			String line = iLine.next();
 			String[] pieces = line.split(";");  // comments come after a semicolon.
 			if (pieces.length == 0) continue;
@@ -132,12 +134,17 @@ public class GCodeFile {
 			z = pz;
 			ai = px;
 			aj = py;
-			for (j = 1; j < tokens.length; ++j) {
-				if (tokens[j].startsWith("X")) x = Float.valueOf(tokens[j].substring(1)) * scale;
-				if (tokens[j].startsWith("Y")) y = Float.valueOf(tokens[j].substring(1)) * scale;
-				if (tokens[j].startsWith("Z")) z = Float.valueOf(tokens[j].substring(1)) * scale;
-				if (tokens[j].startsWith("I")) ai = px + Float.valueOf(tokens[j].substring(1)) * scale;
-				if (tokens[j].startsWith("J")) aj = py + Float.valueOf(tokens[j].substring(1)) * scale;
+			try {
+				for (j = 1; j < tokens.length; ++j) {
+					if (tokens[j].startsWith("X")) x = Float.valueOf(tokens[j].substring(1)) * scale;
+					if (tokens[j].startsWith("Y")) y = Float.valueOf(tokens[j].substring(1)) * scale;
+					if (tokens[j].startsWith("Z")) z = Float.valueOf(tokens[j].substring(1)) * scale;
+					if (tokens[j].startsWith("I")) ai = px + Float.valueOf(tokens[j].substring(1)) * scale;
+					if (tokens[j].startsWith("J")) aj = py + Float.valueOf(tokens[j].substring(1)) * scale;
+				}
+			} catch(Exception e) {
+				System.out.println("Error on line "+lineCount);
+				e.printStackTrace();
 			}
 
 			if (z != pz) {
@@ -277,10 +284,10 @@ public class GCodeFile {
 		if( linesTotal==0 ) return 0;
 		if(x >= linesTotal) x = linesTotal-1;
 		
-		toMatch = "G00 Z"+toMatch;
+		toMatch = toMatch.trim();
 		while(x>1) {
 			String line = lines.get(x).trim();
-			if(line.startsWith(toMatch)) {
+			if(line.equals(toMatch)) {
 				return x;
 			}
 			--x;
@@ -376,8 +383,8 @@ public class GCodeFile {
 						gl2.glColor3f(1, 0, 0);
 						//g2d.setColor(Color.RED);
 						if(n.type==GCodeNodeType.POS) {
-							robot.gondolaX=(float)n.x1;
-							robot.gondolaY=(float)n.y1;
+							robot.gondolaX=(float)n.x1*10;
+							robot.gondolaY=(float)n.y1*10;
 						}
 					} else if (n.lineNumber <= linesProcessed + lookAhead) {
 						gl2.glColor3f(0, 1, 0);
@@ -472,7 +479,7 @@ public class GCodeFile {
 			if (pieces.length == 0) continue;
 
 			if (line.startsWith(tool_change)) {
-				String numberOnly = line.substring(tool_change.length()).replaceAll("[^0-9]", "");
+				String numberOnly = pieces[0].substring(tool_change.length()).replaceAll("[^0-9]", "");
 				int id = (int) Integer.valueOf(numberOnly, 10);
 				addNodeTool(i, id);
 				switch (id) {

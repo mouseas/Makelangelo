@@ -31,17 +31,17 @@ public class Generator_KochCurve extends ImageGenerator {
 	public boolean generate(Writer out) throws IOException {
 		boolean tryAgain=false;
 		do {
-			final JTextField field_order = new JTextField(Integer.toString(order));
-
 			JPanel panel = new JPanel(new GridLayout(0, 1));
 			panel.add(new JLabel(Translator.get("HilbertCurveOrder")));
+
+			JTextField field_order = new JTextField(Integer.toString(order));
 			panel.add(field_order);
 
 			int result = JOptionPane.showConfirmDialog(null, panel, getName(), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
 			if (result == JOptionPane.OK_OPTION) {
 				order = Integer.parseInt(field_order.getText());
 
-				// TODO: check angleSpan>0, angleSpan<360, numBranches>0, Order>0
+				// TODO: check order>0
 
 				createCurveNow(out);
 				return true;
@@ -55,6 +55,9 @@ public class Generator_KochCurve extends ImageGenerator {
 
 	private void createCurveNow(Writer out) throws IOException {
 		imageStart(out);
+		tool = machine.getCurrentTool();
+		liftPen(out);
+		tool.writeChangeTo(out);
 
 		float v = Math.min((float)(machine.getPaperWidth() * machine.getPaperMargin()),
 				(float)(machine.getPaperHeight() * machine.getPaperMargin())) * 10.0f/2.0f;
@@ -68,16 +71,18 @@ public class Generator_KochCurve extends ImageGenerator {
 		float xx = xmax - xmin;
 		float yy = ymax - ymin;
 		maxSize = xx > yy ? xx : yy;
-		/*
-  // Draw bounding box
-  //SetAbsoluteMode(output);
-  liftPen(output);
-  moveTo(output, xmax, ymax, false);
-  moveTo(output, xmax, ymin, false);
-  moveTo(output, xmin, ymin, false);
-  moveTo(output, xmin, ymax, false);
-  moveTo(output, xmax, ymax, false);
-		 */
+
+		boolean drawBoundingBox=false;
+		if(drawBoundingBox) {
+			liftPen(out);
+			moveTo(out, xmax, ymax, false);
+			moveTo(out, xmax, ymin, false);
+			moveTo(out, xmin, ymin, false);
+			moveTo(out, xmin, ymax, false);
+			moveTo(out, xmax, ymax, false);
+			liftPen(out);
+		}
+		
 		liftPen(out);
 		// move to starting position
 		turtle.setX(xmax);
@@ -88,6 +93,7 @@ public class Generator_KochCurve extends ImageGenerator {
 		turtle.turn(90);
 		kochCurve(out, order, maxSize);
 		liftPen(out);
+	    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
 	}
 
 

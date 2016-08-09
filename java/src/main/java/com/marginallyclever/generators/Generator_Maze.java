@@ -25,7 +25,7 @@ public class Generator_Maze extends ImageGenerator {
 		boolean removed;
 	}
 
-	protected int rows = 5, columns = 5;
+	protected static int rows = 5, columns = 5;
 	protected float xmax, xmin, ymax, ymin;
 	protected MazeCell[] cells;
 	protected MazeWall[] walls;
@@ -73,6 +73,9 @@ public class Generator_Maze extends ImageGenerator {
 	 */
 	private void createMazeNow(Writer out) throws IOException {
 		imageStart(out);
+		tool = machine.getCurrentTool();
+		liftPen(out);
+		tool.writeChangeTo(out);
 		
 		// build the cells
 		cells = new MazeCell[rows * columns];
@@ -154,11 +157,11 @@ public class Generator_Maze extends ImageGenerator {
 
 		// draw the maze
 		drawMaze(out);
+		liftPen(out);
+	    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
 	}
 
 	private void drawMaze(Writer output) throws IOException {
-		imageStart(output);
-
 		ymin = (float)machine.getPaperBottom() * (float)machine.getPaperMargin() * 10;
 		ymax = (float)machine.getPaperTop()    * (float)machine.getPaperMargin() * 10;
 		xmin = (float)machine.getPaperLeft()   * (float)machine.getPaperMargin() * 10;

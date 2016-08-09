@@ -1,18 +1,26 @@
 package com.marginallyclever.converters;
 
 
+import java.awt.GridLayout;
 import java.io.IOException;
 import java.io.Writer;
+
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
 
 import com.marginallyclever.basictypes.TransformedImage;
 import com.marginallyclever.imageFilters.Filter_BlackAndWhite;
 import com.marginallyclever.makelangelo.Translator;
 
 
-public class Converter_Scanline extends ImageConverter {
+public class Converter_Wander extends ImageConverter {
+	static protected int numLines = 2500;
+	
 	@Override
 	public String getName() {
-		return Translator.get("ScanlineName");
+		return Translator.get("ConverterWanderName");
 	}
 
 	/**
@@ -22,6 +30,23 @@ public class Converter_Scanline extends ImageConverter {
 	 */
 	@Override
 	public boolean convert(TransformedImage img,Writer out) throws IOException {
+		final JTextField numLinesField = new JTextField(Integer.toString(numLines));
+
+		JPanel panel = new JPanel(new GridLayout(0,1));
+		panel.add(new JLabel(Translator.get("ConverterWanderLineCount")));
+		panel.add(numLinesField);
+
+		int result = JOptionPane.showConfirmDialog(null, panel, getName(), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+		if (result == JOptionPane.OK_OPTION) {
+			numLines = Integer.parseInt(numLinesField.getText());
+			if(numLines<=1) numLines=1;
+			
+			return convertNow(img,out);
+		}
+		return false;
+	}
+	
+	protected boolean convertNow(TransformedImage img,Writer out) throws IOException {
 		// The picture might be in color.  Smash it to 255 shades of grey.
 		Filter_BlackAndWhite bw = new Filter_BlackAndWhite(255);
 		img = bw.filter(img);
@@ -34,59 +59,68 @@ public class Converter_Scanline extends ImageConverter {
 		tool.writeChangeTo(out);
 
 		// figure out how many lines we're going to have on this image.
-		float steps = tool.getDiameter();
+		float steps = tool.getDiameter()*5;
 		if (steps < 1) steps = 1;
 
 		// Color values are from 0...255 inclusive.  255 is white, 0 is black.
 		// Lift the pen any time the color value is > level (128 or more).
-		double level = 255.0 / 2.0;
+		double level = 255.0 / 4.0;
 
 		// from top to bottom of the margin area...
 		float yBottom = (float)machine.getPaperBottom() * (float)machine.getPaperMargin() * 10;
 		float yTop    = (float)machine.getPaperTop()    * (float)machine.getPaperMargin() * 10;
 		float xLeft   = (float)machine.getPaperLeft()   * (float)machine.getPaperMargin() * 10;
 		float xRight  = (float)machine.getPaperRight()  * (float)machine.getPaperMargin() * 10;
-		
-		liftPen(out);/*
-		moveTo(out,xLeft,yTop,true);
-		lowerPen(out);
-		moveTo(out,xRight,yTop,false);
-		moveTo(out,xRight,yBottom,false);
-		moveTo(out,xLeft,yBottom,false);
-		moveTo(out,xLeft,yTop,false);
-		liftPen(out);
-		moveTo(out,0,0,true);*/
-		
-		
-		float x, y, z;
-		int i = 0;
-		for (y = yBottom; y < yTop; y += steps) {
-			++i;
-			if ((i % 2) == 0) {
-				// every even line move left to right
+		double dy = yTop - yBottom-1;
+		double dx = xRight - xLeft-1;
+		double radius = Math.sqrt(dx*dx+dy*dy);
 
-				//lineTo(file,x,y,pen up?)
-				lineTo(out, (float) 0, (float) y, true);
-				for (x = xLeft; x < xRight; ++x) {
-					// read the image at x,y
-					z = img.sample3x3(x, y);
-					lineTo(out, x, y, (z > level));
-				}
-				lineTo(out, xRight, y, true);
-			} else {
-				// every odd line move right to left
-				lineTo(out, xRight, y, true);
-				for (x = xRight; x >= xLeft; --x) {
-					z = img.sample3x3(x, y);
-					lineTo(out, x, y, (z > level));
-				}
-				lineTo(out, xLeft, y, true);
-			}
+		liftPen(out);
+		moveTo(out,0,yTop,true);
+
+		double startPX = 0; 
+		double startPY = yTop; 
+		double r2 = radius*2;
+
+		int i;
+		for(i=0;i<numLines;++i) {
+			level = 200.0 * (double)i / (double)numLines;
+			double endPX = xLeft   + (Math.random() * dx)+0.5; 
+			double endPY = yBottom + (Math.random() * dy)+0.5; 
+
+			convertAlongLine(startPX,startPY,endPX,endPY,steps,r2,level,img,out);
+			
+			startPX = endPX;
+			startPY = endPY;
 		}
 
 		liftPen(out);
 	    moveTo(out, (float)machine.getHomeX(), (float)machine.getHomeY(),true);
+	    
 		return true;
+	}
+	
+	protected void convertAlongLine(double x0,double y0,double x1,double y1,double stepSize,double r2,double level,TransformedImage img,Writer out) throws IOException {
+		double b;
+		double dx=x1-x0;
+		double dy=y1-y0;
+		double halfStep = stepSize/2;
+		double steps = r2 / stepSize;
+		if(steps<1) steps=1;
+
+		double n,x,y,v;
+
+		for (b = 0; b <= steps; ++b) {
+			n = b / steps;
+			x = dx * n + x0;
+			y = dy * n + y0;
+			if(isInsidePaperMargins(x, y)) {
+				v = img.sample( x - halfStep, y - halfStep, x + halfStep, y + halfStep);
+			} else {
+				v = 255;
+			}
+			lineTo(out, x, y, v>=level);
+		}
 	}
 }
 

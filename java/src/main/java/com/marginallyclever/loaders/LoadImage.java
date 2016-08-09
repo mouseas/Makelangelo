@@ -31,12 +31,17 @@ import javax.swing.filechooser.FileNameExtensionFilter;
 import com.marginallyclever.basictypes.ImageManipulator;
 import com.marginallyclever.basictypes.TransformedImage;
 import com.marginallyclever.converters.ImageConverter;
-import com.marginallyclever.generators.Generator_YourMessageHere;
+import com.marginallyclever.generators.Generator_Text;
 import com.marginallyclever.makelangelo.Log;
 import com.marginallyclever.makelangelo.PreferencesHelper;
 import com.marginallyclever.makelangelo.Translator;
 import com.marginallyclever.makelangeloRobot.MakelangeloRobot;
 
+/**
+ * LoadImage uses an InputStream of data to create gcode. 
+ * @author Dan Royer
+ *
+ */
 public class LoadImage extends ImageManipulator implements LoadFileType {
 	
 	@SuppressWarnings("deprecation")
@@ -128,8 +133,8 @@ public class LoadImage extends ImageManipulator implements LoadFileType {
 	 * Load and convert the image in the chosen style
 	 * @return false if loading cancelled or failed.
 	 */
-	public boolean load(InputStream in,MakelangeloRobot robot) {
-		TransformedImage img;
+	public boolean load(InputStream in,final MakelangeloRobot robot) {
+		final TransformedImage img;
 		try {
 			img = new TransformedImage( ImageIO.read(in) );
 		} catch (IOException e1) {
@@ -153,11 +158,10 @@ public class LoadImage extends ImageManipulator implements LoadFileType {
 		}
 		
 		// where to save temp output file?
-		final String destinationFile = System.getProperty("user.dir") + "/temp.ngc";;
+		final String destinationFile = System.getProperty("user.dir") + "/temp.ngc";
 
 		converters = ServiceLoader.load(ImageConverter.class);
-		if (chooseImageConversionOptions(robot) == false)
-			return false;
+		if (!chooseImageConversionOptions(robot)) return false;
 
 		final ProgressMonitor pm = new ProgressMonitor(null, Translator.get("Converting"), "", 0, 100);
 		pm.setProgress(0);
@@ -183,7 +187,6 @@ public class LoadImage extends ImageManipulator implements LoadFileType {
 					}
 					converter.setParent(this);
 					converter.setProgressMonitor(pm);
-
 					converter.setRobot(robot);
 					robot.setDecorator(converter);
 					converter.convert(img, out);
@@ -191,7 +194,7 @@ public class LoadImage extends ImageManipulator implements LoadFileType {
 
 					if (robot.getSettings().shouldSignName()) {
 						// Sign name
-						Generator_YourMessageHere ymh = new Generator_YourMessageHere();
+						Generator_Text ymh = new Generator_Text();
 						ymh.setRobot(robot);
 						ymh.signName(out);
 					}

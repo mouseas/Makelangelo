@@ -11,7 +11,8 @@ import com.marginallyclever.makelangeloRobot.MakelangeloRobotSettings;
 
 /**
  * Converts a BufferedImage to gcode
- * @author danroyer
+ * Don't forget http://www.reverb-marketing.com/wiki/index.php/When_a_new_style_has_been_added_to_the_Makelangelo_software
+ * @author Dan Royer
  *
  */
 public abstract class ImageConverter extends ImageManipulator implements DrawPanelDecorator {
@@ -23,7 +24,9 @@ public abstract class ImageConverter extends ImageManipulator implements DrawPan
 		return false;
 	}
 
-	
-	@Override
+	/**
+	 * live preview as the system is converting pictures.
+	 * draw the results as the calculation is being performed.
+	 */
 	public void render(GL2 gl2,MakelangeloRobotSettings settings) {}
 }

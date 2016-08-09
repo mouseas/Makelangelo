@@ -51,7 +51,7 @@ import com.marginallyclever.basictypes.CollapsiblePanel;
 import com.marginallyclever.savers.SaveFileType;
 
 /**
- * Controls related to converting an image to gcode
+ * Control panel for a Makelangelo robot
  *
  * @author dan royer
  * @author Peter Colapietro
@@ -69,10 +69,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 
 	// connect menu
 	private CollapsiblePanel connectionPanel;
-	private JPanel connectionList;
-	private JComboBox<String> connectionComboBox;
-	private boolean ignoreSelectionEvents=false;
-	private JButton buttonRescan;
+	private JButton buttonConnect;
 	
 	// machine options
 	protected String lastFileIn = "";
@@ -83,7 +80,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 	private JComboBox<String> machineChoices;
 	private JButton openConfig;
 	private JPanel machineNumberPanel;
-	private JButton buttonOpenFile, buttonNewFile, buttonGenerate, buttonSaveFile;
+	private JButton buttonOpenFile, buttonReopenFile, buttonNewFile, buttonGenerate, buttonSaveFile;
 	protected JButton buttonStart, buttonStartAt, buttonPause, buttonHalt;
 
 	// driving controls
@@ -98,6 +95,48 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 	private JButton toggleEngagedMotor;
 
 	public StatusBar statusBar;
+	
+	
+	public MakelangeloRobotPanel(Makelangelo gui, MakelangeloRobot robot) {
+		this.gui = gui;
+		this.robot = robot;
+		
+		this.setBorder(BorderFactory.createEmptyBorder());
+
+		JPanel panel = new JPanel(new GridBagLayout());
+		this.setViewportView(panel);
+
+		GridBagConstraints con1 = new GridBagConstraints();
+		con1.gridx = 0;
+		con1.gridy = 0;
+		con1.weightx = 1;
+		con1.weighty = 0;
+		con1.fill = GridBagConstraints.HORIZONTAL;
+		con1.anchor = GridBagConstraints.NORTHWEST;
+
+		panel.add(createConnectPanel(), con1);		con1.gridy++;
+		
+		// settings
+		machineNumberPanel = new JPanel(new GridBagLayout());
+		updateMachineNumberPanel();
+		panel.add(machineNumberPanel, con1);
+		con1.gridy++;
+
+		panel.add(createDriveControls(),con1);			con1.gridy++;
+		panel.add(createCreativeControlPanel(), con1);	con1.gridy++;
+		panel.add(createAnimationPanel(),con1);			con1.gridy++;
+
+		statusBar = new StatusBar();
+		panel.add(statusBar, con1);
+		con1.gridy++;
+
+		// always have one extra empty at the end to push everything up.
+		con1.weighty = 1;
+		panel.add(new JLabel(), con1);
+		
+		// lastly, set the button states
+		updateButtonAccess();
+	}
 
 
 	protected List<SaveFileType> loadFileSavers() {
@@ -123,7 +162,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 	}
 
 
-	protected JPanel getConnectPanel() {
+	protected JPanel createConnectPanel() {
 		connectionPanel = new CollapsiblePanel(Translator.get("MenuConnect"));
 		JPanel contents =connectionPanel.getContentPane();
 		
@@ -135,30 +174,37 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		con1.fill=GridBagConstraints.HORIZONTAL;
 		con1.anchor=GridBagConstraints.NORTH;
 		
-		connectionList = new JPanel(new GridLayout(0,1));
-		rescanConnections();
-		
-        buttonRescan = new JButton(Translator.get("MenuRescan"));
-        buttonRescan.addActionListener(this);
+        buttonConnect = new JButton(Translator.get("ButtonConnect"));
+        buttonConnect.addActionListener(this);
 
-        contents.add(connectionList,con1);
-		con1.gridy++;
-		contents.add(buttonRescan,con1);
+		contents.add(buttonConnect,con1);
 		con1.gridy++;
 
 	    return connectionPanel;
 	}
+
 	
+	protected void closeConnection() {
+		robot.setConnection(null);
+		buttonConnect.setText(Translator.get("ButtonConnect"));
+	}
 	
-	protected void rescanConnections() {
-		ignoreSelectionEvents=true;
-	    connectionComboBox = new JComboBox<String>();
+	protected void openConnection() {
+		JPanel connectionList = new JPanel(new GridLayout(0, 1));
+		connectionList.add(new JLabel(Translator.get("MenuConnect")));
+		
+		GridBagConstraints con1 = new GridBagConstraints();
+		con1.gridx=0;
+		con1.gridy=0;
+		con1.weightx=1;
+		con1.weighty=1;
+		con1.fill=GridBagConstraints.HORIZONTAL;
+		con1.anchor=GridBagConstraints.NORTH;
+
+		JComboBox<String> connectionComboBox = new JComboBox<String>();
         connectionComboBox.addItemListener(this);
         connectionList.removeAll();
         connectionList.add(connectionComboBox);
-	    
-        connectionComboBox.addItem("No connection"); // index 0
-	    connectionComboBox.setSelectedIndex(0);
 	    
 	    String recentConnection = "";
 	    if(robot.getConnection()!=null) {
@@ -175,74 +221,27 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		    	}
 		    }
 	    }
-        ignoreSelectionEvents=false;
+        
+		int result = JOptionPane.showConfirmDialog(this.getRootPane(), connectionList, getName(), JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+		if (result == JOptionPane.OK_OPTION) {
+			String connectionName = connectionComboBox.getItemAt(connectionComboBox.getSelectedIndex());
+			robot.setConnection( gui.getConnectionManager().openConnection(connectionName) );
+			updateMachineNumberPanel();
+			updateButtonAccess();
+			buttonConnect.setText(Translator.get("ButtonDisconnect"));
+		}
 	}
 	
 
 	@Override
 	public void itemStateChanged(ItemEvent e) {
 		Object subject = e.getSource();
-		
-		if(subject == connectionComboBox) {
-			if(ignoreSelectionEvents==false && e.getStateChange()==ItemEvent.SELECTED) {
-				if(connectionComboBox.getSelectedIndex()==0) {
-					// Disconnect
-					robot.setConnection(null);
-				} else {
-					String connectionName = connectionComboBox.getItemAt(connectionComboBox.getSelectedIndex());
-					robot.setConnection( gui.getConnectionManager().openConnection(connectionName) );
-				}
-				updateMachineNumberPanel();
-				updateButtonAccess();
-				rescanConnections();
-				return;
-			}
+
+		if(subject == machineChoices && e.getStateChange()==ItemEvent.SELECTED) {
+			int selectedIndex = machineChoices.getSelectedIndex();
+			long newUID = Long.parseLong(machineChoices.getItemAt(selectedIndex));
+			robot.getSettings().loadConfig(newUID);
 		}
-	}
-	
-	
-	public MakelangeloRobotPanel(Makelangelo gui, MakelangeloRobot robot) {
-		this.gui = gui;
-		this.robot = robot;
-		
-		this.setBorder(BorderFactory.createEmptyBorder());
-
-		JPanel panel = new JPanel(new GridBagLayout());
-		this.setViewportView(panel);
-
-		GridBagConstraints con1 = new GridBagConstraints();
-		con1.gridx = 0;
-		con1.gridy = 0;
-		con1.weightx = 1;
-		con1.weighty = 0;
-		con1.fill = GridBagConstraints.HORIZONTAL;
-		con1.anchor = GridBagConstraints.NORTHWEST;
-
-		JPanel connectPanel = getConnectPanel();
-		panel.add(connectPanel, con1);
-		con1.gridy++;
-
-		
-		// settings
-		machineNumberPanel = new JPanel(new GridBagLayout());
-		updateMachineNumberPanel();
-		panel.add(machineNumberPanel, con1);
-		con1.gridy++;
-
-		panel.add(createDriveControls(),con1);			con1.gridy++;
-		panel.add(createCreativeControlPanel(), con1);	con1.gridy++;
-		panel.add(createAnimationPanel(),con1);			con1.gridy++;
-
-		statusBar = new StatusBar();
-		panel.add(statusBar, con1);
-		con1.gridy++;
-
-		// always have one extra empty at the end to push everything up.
-		con1.weighty = 1;
-		panel.add(new JLabel(), con1);
-		
-		// lastly, set the button states
-		updateButtonAccess();
 	}
 
 	
@@ -289,6 +288,11 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		buttonOpenFile = new JButton(Translator.get("MenuOpenFile"));
 		buttonOpenFile.addActionListener(this);
 		panel.add(buttonOpenFile, con1);
+		con1.gridy++;
+		
+		buttonReopenFile = new JButton(Translator.get("MenuReopenFile"));
+		buttonReopenFile.addActionListener(this);
+		panel.add(buttonReopenFile, con1);
 		con1.gridy++;
 
 		buttonGenerate = new JButton(Translator.get("MenuGenerate"));
@@ -462,6 +466,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 			else if( robot.isPortConfirmed() == false ) state=true;
 			
 			machineChoices.setEnabled( state );
+			machineChoices.addItemListener(this);
 		}
 
 		openConfig = new JButton(Translator.get("configureMachine"));
@@ -470,19 +475,18 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		machineNumberPanel.add(openConfig,cMachine);
 		cMachine.gridx++;
 	}
-
+	
 	// The user has done something. respond to it.
 	public void actionPerformed(ActionEvent e) {
 		Object subject = e.getSource();
 
-		if( machineChoices != null ) {
-			// TODO: maybe only run this when the machineChoices comboBox changes to a new value
-			int selectedIndex = machineChoices.getSelectedIndex();
-			long newUID = Long.parseLong(machineChoices.getItemAt(selectedIndex));
-			robot.getSettings().loadConfig(newUID);
+		if( subject == buttonConnect ) {
+			if(robot.isPortConfirmed()) {
+				closeConnection();
+			} else {
+				openConnection();
+			}
 		}
-		
-		if( subject == buttonRescan ) rescanConnections();
 		else if (subject == openConfig) {
 			Frame frame = (Frame)this.getRootPane().getParent();
 			MakelangeloSettingsDialog m = new MakelangeloSettingsDialog(frame, robot);
@@ -490,6 +494,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		}
 		else if (subject == buttonNewFile) newFile();
 		else if (subject == buttonOpenFile) openFileDialog();
+		else if (subject == buttonReopenFile) reopenFile();
 		else if (subject == buttonGenerate) generateImage();
 		else if (subject == buttonSaveFile) saveFileDialog();
 		else if (subject == buttonStart) robot.startAt(0);
@@ -539,13 +544,10 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 				robot.setFeedRate(parsedFeedRate);
 			} catch(NumberFormatException e1) {}
 		} else if (subject == toggleEngagedMotor) {
-			// TODO if someone sends "M17" or "M18" through the advanced panel then these buttons will be displayed wrong.
 			if(robot.areMotorsEngaged() ) {
-				robot.disengageMotors();
-				toggleEngagedMotor.setText(Translator.get("EngageMotors"));
+				disengageMotors();
 			} else {
-				robot.engageMotors();
-				toggleEngagedMotor.setText(Translator.get("DisengageMotors"));
+				engageMotors();
 			}
 		} else {
 			float dx=0;
@@ -569,11 +571,25 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		}
 	}
 
+	protected void disengageMotors() {
+		robot.disengageMotors();
+	}
+
+	protected void engageMotors() {
+		robot.engageMotors();
+	}
+	
+	public void motorsHaveBeenDisengaged() {
+		toggleEngagedMotor.setText(Translator.get("EngageMotors"));
+	}
+	public void motorsHaveBeenEngaged() {
+		toggleEngagedMotor.setText(Translator.get("DisengageMotors"));
+	}
+	
 	/**
 	 * open a dialog to ask for the line number.
 	 *
-	 * @return <code>lineNumber</code> greater than or equal to zero if user hit
-	 *         ok.
+	 * @return <code>lineNumber</code> greater than or equal to zero if user hits ok.
 	 */
 	private int getStartingLineNumber() {
 		final JPanel panel = new JPanel(new GridBagLayout());
@@ -603,6 +619,15 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		return -1;
 	}
 
+	/**
+	 * the moment a robot is confirmed to have connected 
+	 */
+	public void onConnect() {
+		updateMachineNumberPanel();
+		updateButtonAccess();
+		disengageMotors();
+	}
+	
 	public void updateButtonAccess() {
 		boolean isConfirmed=false;
 		boolean isRunning=false;
@@ -631,6 +656,7 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		toggleEngagedMotor.setEnabled(isConfirmed && !isRunning);
 		buttonNewFile.setEnabled(!isRunning);
 		buttonOpenFile.setEnabled(!isRunning);
+		buttonReopenFile.setEnabled(!isRunning && (!lastFileIn.isEmpty()));
 		buttonGenerate.setEnabled(!isRunning);
 
 		down100.setEnabled(isConfirmed && !isRunning);
@@ -681,7 +707,6 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		}
 
 		JFileChooser fc = new JFileChooser(new File(lastFileIn));
-
 		ServiceLoader<LoadFileType> imageLoaders = ServiceLoader.load(LoadFileType.class);
 		Iterator<LoadFileType> i = imageLoaders.iterator();
 		while(i.hasNext()) {
@@ -692,8 +717,15 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 
 		if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
 			String selectedFile = fc.getSelectedFile().getAbsolutePath();
-			openFileOnDemand(selectedFile);
+			if(openFileOnDemand(selectedFile)) {
+				lastFileIn = selectedFile;
+				updateButtonAccess();
+			}
 		}
+	}
+	
+	private void reopenFile() {
+		openFileOnDemand(lastFileIn);
 	}
 
 	public void generateImage() {
@@ -807,8 +839,9 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 	/**
 	 * User has asked that a file be opened.
 	 * @param filename the file to be opened.
+	 * @return true if file was loaded successfully.  false if it failed.
 	 */
-	public void openFileOnDemand(String filename) {
+	public boolean openFileOnDemand(String filename) {
 		Log.message(Translator.get("OpeningFile") + filename + "...");
 		boolean success=false;
 		boolean attempted=false;
@@ -835,12 +868,12 @@ public class MakelangeloRobotPanel extends JScrollPane implements ActionListener
 		}
 
 		if (success == true) {
-			lastFileIn = filename;
 			Log.message(Translator.get("Finished"));
 			SoundSystem.playConversionFinishedSound();
 		}
 
 		gui.updateMenuBar();
 		statusBar.clear();
+		return success;
 	}
 }

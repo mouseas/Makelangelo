@@ -1,29 +1,35 @@
-package com.marginallyclever.filters;
+package com.marginallyclever.imageFilters;
 
+import com.marginallyclever.basictypes.C3;
+import com.marginallyclever.basictypes.ColorPalette;
 import com.marginallyclever.basictypes.TransformedImage;
+
 
 /**
  * Floyd/Steinberg dithering
  *
  * @author Dan
- * @see <a href="http://en.literateprograms.org/Floyd-Steinberg_dithering_%28C%29">http://en.literateprograms.org/Floyd-Steinberg_dithering_%28C%29</a> and <a href="http://www.home.unix-ag.org/simon/gimp/fsdither.c">http://www.home.unix-ag.org/simon/gimp/fsdither.c</a>
+ * @see <a href="http://stackoverflow.com/questions/5940188/how-to-convert-a-24-bit-png-to-3-bit-png-using-floyd-steinberg-dithering">http://stackoverflow.com/questions/5940188/how-to-convert-a-24-bit-png-to-3-bit-png-using-floyd-steinberg-dithering</a>
  */
-public class Filter_DitherFloydSteinberg extends ImageFilter {
-  private long tone;
+public class Filter_DitherFloydSteinbergColor extends ImageFilter {
+  public ColorPalette palette;
 
-
-  private int quantizeColor(int original) {
-    int i = (int) Math.min(Math.max(original, 0), 255);
-    return (i > tone) ? 255 : 0;
+  public Filter_DitherFloydSteinbergColor() {
+    palette = new ColorPalette();
+    palette.addColor(new C3(255, 0, 0));
+    palette.addColor(new C3(0, 255, 0));
+    palette.addColor(new C3(0, 0, 255));
   }
 
 
-  private void ditherDirection(TransformedImage img, int y, int[] error, int[] nexterror, int direction) {
+  private void ditherDirection(TransformedImage img, int y, C3[] error, C3[] nexterror, int direction) {
     int w = img.getSourceImage().getWidth();
-    int oldPixel, newPixel, quant_error;
+    C3 oldPixel = new C3(0, 0, 0);
+    C3 newPixel = new C3(0, 0, 0);
+    C3 quant_error = new C3(0, 0, 0);
     int start, end, x;
 
-    for (x = 0; x < w; ++x) nexterror[x] = 0;
+    for (x = 0; x < w; ++x) nexterror[x].set(0, 0, 0);
 
     if (direction > 0) {
       start = 0;
@@ -36,57 +42,48 @@ public class Filter_DitherFloydSteinberg extends ImageFilter {
     // for each x from left to right
     for (x = start; x != end; x += direction) {
       // oldpixel := pixel[x][y]
-      oldPixel = decode(img.getSourceImage().getRGB(x, y)) + error[x];
+      oldPixel.set(new C3(img.getSourceImage().getRGB(x, y)).add(error[x]));
       // newpixel := find_closest_palette_color(oldpixel)
-      newPixel = quantizeColor(oldPixel);
+      newPixel = palette.quantize(oldPixel);
       // pixel[x][y] := newpixel
-      img.getSourceImage().setRGB(x, y, ImageFilter.encode(newPixel));
+      img.getSourceImage().setRGB(x, y, newPixel.toInt());
       // quant_error := oldpixel - newpixel
-      quant_error = oldPixel - newPixel;
+      quant_error.set(oldPixel.sub(newPixel));
       // pixel[x+1][y  ] += 7/16 * quant_error
       // pixel[x-1][y+1] += 3/16 * quant_error
       // pixel[x  ][y+1] += 5/16 * quant_error
       // pixel[x+1][y+1] += 1/16 * quant_error
-      nexterror[x] += 5.0 / 16.0 * quant_error;
+      nexterror[x].add(quant_error.mul(5.0 / 16.0));
       if (x + direction >= 0 && x + direction < w) {
-        error[x + direction] += 7.0 / 16.0 * quant_error;
-        nexterror[x + direction] += 1.0 / 16.0 * quant_error;
+        error[x + direction].add(quant_error.mul(7.0 / 16.0));
+        nexterror[x + direction].add(quant_error.mul(1.0 / 16.0));
       }
       if (x - direction >= 0 && x - direction < w) {
-        nexterror[x - direction] += 3.0 / 16.0 * quant_error;
+        nexterror[x - direction].add(quant_error.mul(3.0 / 16.0));
       }
     }
   }
 
   
   public TransformedImage filter(TransformedImage img) {
-    int y, x;
+    int y;
     int h = img.getSourceImage().getHeight();
     int w = img.getSourceImage().getWidth();
     int direction = 1;
-    int[] error = new int[w];
-    int[] nexterror = new int[w];
+    C3[] error = new C3[w];
+    C3[] nexterror = new C3[w];
 
     for (y = 0; y < w; ++y) {
-      error[y] = nexterror[y] = 0;
+      error[y] = new C3(0, 0, 0);
+      nexterror[y] = new C3(0, 0, 0);
     }
-
-    // find the average color of the system
-    for (y = 0; y < h; ++y) {
-      for (x = 0; x < w; ++x) {
-        tone += decode(img.getSourceImage().getRGB(x, y));
-      }
-    }
-
-    tone /= (w * h);
-
 
     // for each y from top to bottom
     for (y = 0; y < h; ++y) {
       ditherDirection(img, y, error, nexterror, direction);
 
-      direction = direction > 0 ? -1 : 1;
-      int[] tmp = error;
+      direction = -direction;
+      C3[] tmp = error;
       error = nexterror;
       nexterror = tmp;
     }
